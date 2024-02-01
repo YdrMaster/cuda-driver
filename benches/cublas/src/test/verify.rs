@@ -1,8 +1,5 @@
-﻿use super::{rand_blob, uninit_blob, ALPHA, BETA, K, M, N};
-use crate::{
-    mat_mul::{matmul, tune},
-    CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder,
-};
+﻿use super::{rand_blob, ALPHA, BETA, K, M, N};
+use crate::{matmul, tune, CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
 use cuda::{AsRaw, Device};
 use std::ptr::null_mut;
 
@@ -16,7 +13,7 @@ fn general() {
         let stream = ctx.stream();
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(K * N, &stream);
-        let dev_c = uninit_blob(M * N, &stream);
+        let dev_c = stream.malloc_for::<f32>(M * N);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -49,13 +46,6 @@ fn general() {
         let mut cublaslt_handle = null_mut();
         cublas!(cublasLtCreate(&mut cublaslt_handle));
 
-        let mut matmul_desc = null_mut();
-        cublas!(cublasLtMatmulDescCreate(
-            &mut matmul_desc,
-            cublasComputeType_t::CUBLAS_COMPUTE_32F,
-            cudaDataType_t::CUDA_R_32F,
-        ));
-
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
             cols: K as _,
@@ -78,11 +68,18 @@ fn general() {
             ..Default::default()
         });
 
-        let (algo, workspace_size) = tune(cublaslt_handle, matmul_desc, &a_desc, &b_desc, &c_desc);
+        let matmul_desc = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
+        let (algo, workspace_size) = tune(
+            cublaslt_handle,
+            unsafe { matmul_desc.as_raw() },
+            &a_desc,
+            &b_desc,
+            &c_desc,
+        );
         let workspace = stream.malloc(workspace_size);
         matmul(
             cublaslt_handle,
-            matmul_desc,
+            unsafe { matmul_desc.as_raw() },
             1.,
             (&a_desc, unsafe { dev_a.as_raw() } as _),
             (&b_desc, unsafe { dev_b.as_raw() } as _),
@@ -117,7 +114,7 @@ fn batching() {
         let stream = ctx.stream();
         let dev_a = rand_blob(BATCH * M * K, &stream);
         let dev_b = rand_blob(BATCH * K * N, &stream);
-        let dev_c = uninit_blob(BATCH * M * N, &stream);
+        let dev_c = stream.malloc_for::<f32>(BATCH * M * N);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -154,13 +151,6 @@ fn batching() {
         let mut cublaslt_handle = null_mut();
         cublas!(cublasLtCreate(&mut cublaslt_handle));
 
-        let mut matmul_desc = null_mut();
-        cublas!(cublasLtMatmulDescCreate(
-            &mut matmul_desc,
-            cublasComputeType_t::CUBLAS_COMPUTE_32F,
-            cudaDataType_t::CUDA_R_32F,
-        ));
-
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
             cols: K as _,
@@ -189,11 +179,18 @@ fn batching() {
             ..Default::default()
         });
 
-        let (algo, workspace_size) = tune(cublaslt_handle, matmul_desc, &a_desc, &b_desc, &c_desc);
+        let matmul_desc = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
+        let (algo, workspace_size) = tune(
+            cublaslt_handle,
+            unsafe { matmul_desc.as_raw() },
+            &a_desc,
+            &b_desc,
+            &c_desc,
+        );
         let workspace = stream.malloc(workspace_size);
         matmul(
             cublaslt_handle,
-            matmul_desc,
+            unsafe { matmul_desc.as_raw() },
             1.,
             (&a_desc, unsafe { dev_a.as_raw() } as _),
             (&b_desc, unsafe { dev_b.as_raw() } as _),
@@ -231,7 +228,7 @@ fn broadcast() {
         let stream = ctx.stream();
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(BATCH * K * N, &stream);
-        let dev_c = uninit_blob(BATCH * M * N, &stream);
+        let dev_c = stream.malloc_for::<f32>(BATCH * M * N);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -266,13 +263,6 @@ fn broadcast() {
         let mut cublaslt_handle = null_mut();
         cublas!(cublasLtCreate(&mut cublaslt_handle));
 
-        let mut matmul_desc = null_mut();
-        cublas!(cublasLtMatmulDescCreate(
-            &mut matmul_desc,
-            cublasComputeType_t::CUBLAS_COMPUTE_32F,
-            cudaDataType_t::CUDA_R_32F,
-        ));
-
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
             cols: K as _,
@@ -301,11 +291,18 @@ fn broadcast() {
             ..Default::default()
         });
 
-        let (algo, workspace_size) = tune(cublaslt_handle, matmul_desc, &a_desc, &b_desc, &c_desc);
+        let matmul_desc = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
+        let (algo, workspace_size) = tune(
+            cublaslt_handle,
+            unsafe { matmul_desc.as_raw() },
+            &a_desc,
+            &b_desc,
+            &c_desc,
+        );
         let workspace = stream.malloc(workspace_size);
         matmul(
             cublaslt_handle,
-            matmul_desc,
+            unsafe { matmul_desc.as_raw() },
             1.,
             (&a_desc, unsafe { dev_a.as_raw() } as _),
             (&b_desc, unsafe { dev_b.as_raw() } as _),

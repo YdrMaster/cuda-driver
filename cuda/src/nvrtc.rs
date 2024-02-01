@@ -117,7 +117,7 @@ impl Module {
         ];
         {
             let cccl = std::option_env!("CCCL_ROOT").map_or_else(
-                || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cuda/cccl"),
+                || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cccl"),
                 |dir| PathBuf::from(dir),
             );
             let cudacxx = cccl.join("libcudacxx/include");
@@ -185,8 +185,6 @@ impl Module {
 fn test_env() {
     let cuda_root = std::env!("CUDA_ROOT");
     assert!(!cuda_root.is_empty());
-    let proj = std::env!("CARGO_MANIFEST_DIR");
-    println!("proj = \"{}\"", proj);
     // println!("cuda root = \"{}\"", cuda_root);
 }
 

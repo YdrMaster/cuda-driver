@@ -20,9 +20,24 @@ pub mod bindings {
     }
 }
 
-mod mat_mul;
+#[macro_use]
+pub mod macros {
+    #[macro_export]
+    macro_rules! cublaslt_matmul {
+        ($compute_type:ident, $scale_type:ident) => {{
+            $crate::CublasLtMatMulDescriptor::new(
+                $crate::bindings::cublasComputeType_t::$compute_type,
+                $crate::bindings::cudaDataType::$scale_type,
+            )
+        }};
+    }
+}
+
 mod matrix;
-#[cfg(test)]
-mod test;
+mod multiply;
 
 pub use matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
+pub use multiply::{matmul, tune, CublasLtMatMulDescriptor};
+
+#[cfg(test)]
+mod test;

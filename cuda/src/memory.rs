@@ -14,6 +14,18 @@ impl ContextGuard<'_> {
     }
 
     #[inline]
+    pub fn malloc_for<T: Copy>(&self, len: usize) -> DevicePtr {
+        self.malloc(Layout::array::<T>(len).unwrap().size())
+    }
+
+    #[inline]
+    pub fn from_slice<T: Copy>(&self, slice: &[T]) -> DevicePtr {
+        let mut ans = self.malloc_for::<T>(slice.len());
+        unsafe { ans.copy_in(slice, self) };
+        ans
+    }
+
+    #[inline]
     pub fn free(&self, ptr: DevicePtr) {
         driver!(cuMemFree_v2(ptr.0));
     }
@@ -25,6 +37,18 @@ impl Stream<'_> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, size, self.as_raw()));
         DevicePtr(ptr)
+    }
+
+    #[inline]
+    pub fn malloc_for<T: Copy>(&self, len: usize) -> DevicePtr {
+        self.malloc(Layout::array::<T>(len).unwrap().size())
+    }
+
+    #[inline]
+    pub fn from_slice<T: Copy>(&self, slice: &[T]) -> DevicePtr {
+        let mut ans = self.malloc_for::<T>(slice.len());
+        unsafe { ans.copy_in_async(slice, self) };
+        ans
     }
 
     #[inline]
