@@ -8,7 +8,7 @@ pub struct DevicePtr(cuda::CUdeviceptr);
 impl ContextGuard<'_> {
     #[inline]
     pub fn malloc(&self, size: usize) -> DevicePtr {
-        let mut ptr: cuda::CUdeviceptr = 0;
+        let mut ptr = 0;
         driver!(cuMemAlloc_v2(&mut ptr, size));
         DevicePtr(ptr)
     }
@@ -22,7 +22,7 @@ impl ContextGuard<'_> {
 impl Stream<'_> {
     #[inline]
     pub fn malloc(&self, size: usize) -> DevicePtr {
-        let mut ptr: cuda::CUdeviceptr = 0;
+        let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, size, self.as_raw()));
         DevicePtr(ptr)
     }

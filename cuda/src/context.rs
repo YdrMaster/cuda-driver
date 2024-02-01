@@ -11,7 +11,7 @@ unsafe impl Sync for Context {}
 impl Device {
     #[inline]
     pub fn context(&self) -> Arc<Context> {
-        let mut context: cuda::CUcontext = null_mut();
+        let mut context = null_mut();
         driver!(cuCtxCreate_v2(&mut context, 0, self.as_raw()));
         driver!(cuCtxPopCurrent_v2(null_mut()));
         Arc::new(Context(context))
@@ -53,7 +53,7 @@ impl Context {
 impl Drop for ContextGuard<'_> {
     #[inline]
     fn drop(&mut self) {
-        let mut top: cuda::CUcontext = null_mut();
+        let mut top = null_mut();
         driver!(cuCtxPopCurrent_v2(&mut top));
         debug_assert_eq!(top, self.0 .0)
     }

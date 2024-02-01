@@ -5,9 +5,9 @@
 use std::{
     collections::{hash_map::Keys, HashMap},
     ffi::{c_char, CStr, CString},
+    path::PathBuf,
     ptr::{null, null_mut},
-    sync::Arc,
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 static MODULES: OnceLock<Mutex<HashMap<String, Arc<Module>>>> = OnceLock::new();
@@ -103,7 +103,7 @@ impl Module {
             }
             .unwrap()
         };
-        let mut program: cuda::nvrtcProgram = null_mut();
+        let mut program = null_mut();
         nvrtc!(nvrtcCreateProgram(
             &mut program,
             code.as_ptr().cast(),
@@ -113,11 +113,23 @@ impl Module {
             null(),
         ));
 
-        let options = vec![
+        let mut options = vec![
             CString::new("--std=c++17").unwrap(),
             CString::new("--gpu-architecture=compute_80").unwrap(),
             CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap(),
         ];
+        {
+            let cccl = std::option_env!("CCCL_ROOT").map_or_else(
+                || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cuda/cccl"),
+                |dir| PathBuf::from(dir),
+            );
+            let cudacxx = cccl.join("libcudacxx/include");
+            let cub = cccl.join("cub");
+            assert!(cudacxx.is_dir(), "cudacxx not exist");
+            assert!(cub.is_dir(), "cub not exist");
+            options.push(CString::new(format!("-I{}\n", cudacxx.display())).unwrap());
+            options.push(CString::new(format!("-I{}\n", cub.display())).unwrap());
+        }
         let options = options
             .iter()
             .map(|s| s.as_ptr().cast::<c_char>())
@@ -151,7 +163,7 @@ impl Module {
         };
         let ptx = CStr::from_bytes_with_nul(ptx.as_slice()).unwrap();
 
-        let mut module: cuda::CUmodule = null_mut();
+        let mut module = null_mut();
         driver!(cuModuleLoadData(&mut module, ptx.as_ptr().cast()));
         (
             Ok(Self {
@@ -165,7 +177,7 @@ impl Module {
     #[inline]
     fn get_function(&self, name: &str) -> cuda::CUfunction {
         let name = CString::new(name).unwrap();
-        let mut func: cuda::CUfunction = null_mut();
+        let mut func = null_mut();
         self.ctx
             .apply(|_| driver!(cuModuleGetFunction(&mut func, self.module, name.as_ptr())));
         func
@@ -176,6 +188,8 @@ impl Module {
 fn test_env() {
     let cuda_root = std::env!("CUDA_ROOT");
     assert!(!cuda_root.is_empty());
+    let proj = std::env!("CARGO_MANIFEST_DIR");
+    println!("proj = \"{}\"", proj);
     // println!("cuda root = \"{}\"", cuda_root);
 }
 
@@ -193,7 +207,7 @@ extern "C" __global__ void kernel() {
     };
     dev.context().apply(|ctx| {
         let code = CString::new(SRC).unwrap();
-        let mut program: cuda::nvrtcProgram = null_mut();
+        let mut program = null_mut();
         nvrtc!(nvrtcCreateProgram(
             &mut program,
             code.as_ptr().cast(),
@@ -215,11 +229,11 @@ extern "C" __global__ void kernel() {
         };
 
         let ptx = CStr::from_bytes_with_nul(ptx.as_slice()).unwrap();
-        let mut module: cuda::CUmodule = null_mut();
+        let mut module = null_mut();
         driver!(cuModuleLoadData(&mut module, ptx.as_ptr().cast()));
 
         let name = CString::new("kernel").unwrap();
-        let mut function: cuda::CUfunction = null_mut();
+        let mut function = null_mut();
         driver!(cuModuleGetFunction(&mut function, module, name.as_ptr()));
 
         driver!(cuLaunchKernel(

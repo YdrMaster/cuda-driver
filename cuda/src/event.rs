@@ -1,12 +1,12 @@
-﻿use crate::AsRaw;
-
-use super::{bindings as cuda, stream::Stream};
+﻿use super::{bindings as cuda, stream::Stream};
+use crate::AsRaw;
 use std::{ptr::null_mut, time::Duration};
 
 #[repr(transparent)]
 pub struct Event(cuda::CUevent);
 
 impl Drop for Event {
+    #[inline]
     fn drop(&mut self) {
         driver!(cuEventDestroy_v2(self.0));
     }
@@ -38,10 +38,12 @@ impl Stream<'_> {
 }
 
 impl Event {
+    #[inline]
     pub fn synchronize(&self) {
         driver!(cuEventSynchronize(self.0));
     }
 
+    #[inline]
     pub fn elapse_from(&self, start: &Self) -> Duration {
         let mut ms = 0.0;
         driver!(cuEventElapsedTime(&mut ms, start.0, self.0));

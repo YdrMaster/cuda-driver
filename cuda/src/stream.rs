@@ -1,11 +1,13 @@
 ﻿use super::{bindings as cuda, context::ContextGuard, AsRaw};
 use std::{marker::PhantomData, ptr::null_mut};
 
+#[repr(transparent)]
 pub struct Stream<'a>(cuda::CUstream, PhantomData<&'a ()>);
 
 impl ContextGuard<'_> {
+    #[inline]
     pub fn stream(&self) -> Stream {
-        let mut stream: cuda::CUstream = null_mut();
+        let mut stream = null_mut();
         driver!(cuStreamCreate(&mut stream, 0));
         Stream(stream, PhantomData)
     }
