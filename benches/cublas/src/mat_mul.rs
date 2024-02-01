@@ -1,8 +1,5 @@
-﻿use crate::{
-    bindings::{self as cu, cublas},
-    matrix::CublasLtMatrix,
-};
-use cuda::{driver, AsRaw, Stream};
+﻿use crate::{bindings as cu, CublasLtMatrix};
+use cuda::{AsRaw, Stream};
 use std::ptr::null_mut;
 use std::{
     ffi::c_void,

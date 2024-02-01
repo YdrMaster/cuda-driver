@@ -1,11 +1,9 @@
 ﻿mod bench;
-mod device_blob;
 mod verify;
-
-use std::alloc::Layout;
 
 use cuda::{DevicePtr, Stream};
 use rand::Rng;
+use std::alloc::Layout;
 
 const M: usize = 5376;
 const K: usize = 2048;

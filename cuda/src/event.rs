@@ -1,5 +1,4 @@
-﻿use super::{bindings as cuda, stream::Stream};
-use crate::AsRaw;
+﻿use crate::{bindings as cuda, AsRaw, Stream};
 use std::{ptr::null_mut, time::Duration};
 
 #[repr(transparent)]

@@ -1,6 +1,5 @@
-﻿use crate::AsRaw;
-
-use super::bindings as cuda;
+﻿use crate::bindings as cuda;
+use crate::AsRaw;
 
 #[repr(transparent)]
 pub struct Device(cuda::CUdevice);

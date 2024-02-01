@@ -1,4 +1,4 @@
-﻿use super::{bindings as cuda, context::ContextGuard, stream::Stream, AsRaw};
+﻿use crate::{bindings as cuda, AsRaw, ContextGuard, Stream};
 use std::alloc::Layout;
 
 #[derive(Default, Debug)]

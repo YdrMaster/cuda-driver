@@ -1,4 +1,4 @@
-﻿use super::{bindings as cuda, context::ContextGuard, AsRaw};
+﻿use crate::{bindings as cuda, AsRaw, ContextGuard};
 use std::{marker::PhantomData, ptr::null_mut};
 
 #[repr(transparent)]

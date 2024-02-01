@@ -1,7 +1,4 @@
-﻿use super::{
-    bindings as cuda,
-    context::{Context, ContextGuard},
-};
+﻿use crate::{bindings as cuda, Context, ContextGuard};
 use std::{
     collections::{hash_map::Keys, HashMap},
     ffi::{c_char, CStr, CString},

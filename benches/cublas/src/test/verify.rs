@@ -1,8 +1,7 @@
 ﻿use super::{rand_blob, uninit_blob, ALPHA, BETA, K, M, N};
 use crate::{
-    bindings::cublas,
     mat_mul::{matmul, tune},
-    matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder},
+    CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder,
 };
 use cuda::{AsRaw, Device};
 use std::ptr::null_mut;

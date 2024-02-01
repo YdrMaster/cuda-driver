@@ -1,4 +1,4 @@
-﻿use crate::bindings::{self as cu, cublas};
+﻿use crate::bindings as cu;
 use cuda::AsRaw;
 use std::ptr::null_mut;
 

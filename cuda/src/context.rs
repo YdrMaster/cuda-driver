@@ -1,4 +1,4 @@
-﻿use super::{bindings as cuda, device::Device, AsRaw};
+﻿use crate::{bindings as cuda, AsRaw, Device};
 use std::{ptr::null_mut, sync::Arc};
 
 #[derive(PartialEq, Eq, Debug)]
