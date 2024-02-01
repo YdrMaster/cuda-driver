@@ -12,7 +12,7 @@ use std::{
 
 static MODULES: OnceLock<Mutex<HashMap<String, Arc<Module>>>> = OnceLock::new();
 
-pub(crate) fn compile<'a, I, U, V>(code: &str, symbols: I, ctx: &ContextGuard)
+pub fn compile<'a, I, U, V>(code: &str, symbols: I, ctx: &ContextGuard)
 where
     I: IntoIterator<Item = (U, V)>,
     U: AsRef<str>,
@@ -24,12 +24,12 @@ where
         .collect::<HashMap<_, _>>();
     // 先检查一遍并确保静态对象创建
     let modules = if let Some(modules) = MODULES.get() {
-        if check_hold(&*modules.lock().unwrap(), symbols.keys()) {
+        if check_hold(&modules.lock().unwrap(), symbols.keys()) {
             return;
         }
         modules
     } else {
-        MODULES.get_or_init(|| Default::default())
+        MODULES.get_or_init(Default::default)
     };
     // 编译
     let (module, log) = Module::from_src(code, ctx);
@@ -37,7 +37,7 @@ where
     // 再上锁检查一遍
     let module = Arc::new(module.unwrap());
     let mut map = modules.lock().unwrap();
-    if !check_hold(&*map, symbols.keys()) {
+    if !check_hold(&map, symbols.keys()) {
         for k in symbols.keys() {
             // 确认指定的符号都存在
             module.get_function(k);
@@ -46,7 +46,7 @@ where
     }
 }
 
-pub(crate) fn get_function(name: &str) -> Option<cuda::CUfunction> {
+pub fn get_function(name: &str) -> Option<cuda::CUfunction> {
     MODULES.get().and_then(|modules| {
         modules
             .lock()

@@ -73,7 +73,6 @@ impl ContextGuard<'_> {
         self.0.clone()
     }
 
-    #[allow(unused)]
     #[inline]
     pub fn synchronize(&self) {
         driver!(cuCtxSynchronize());
