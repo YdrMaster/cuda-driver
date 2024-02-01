@@ -1,0 +1,8 @@
+**/.*/*
+!**/.cargo/*
+!/.github/*
+
+/target
+/Cargo.lock
+
+**/*.onnx
