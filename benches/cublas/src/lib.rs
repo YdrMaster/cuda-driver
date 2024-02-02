@@ -31,13 +31,41 @@ pub mod macros {
             )
         }};
     }
+
+    #[macro_export]
+    macro_rules! matmul {
+        (with $handle:expr, on $stream:expr;
+         do $matmul:expr, use $algo:expr, use $workspace:expr;
+         ($alpha:expr; $a:expr, $a_ptr:expr; $b:expr, $b_ptr:expr)
+      => ($beta:expr ; $c:expr, $c_ptr:expr; $d:expr, $d_ptr:expr)
+        ) => {{
+            $handle.matmul(
+                &$matmul,
+                $alpha,
+                &$a,
+                &$a_ptr,
+                &$b,
+                &$b_ptr,
+                $beta,
+                &$c,
+                &$c_ptr,
+                &$d,
+                &$d_ptr,
+                $algo,
+                &$workspace,
+                &$stream,
+            );
+        }};
+    }
 }
 
+mod handle;
 mod matrix;
 mod multiply;
 
+pub use handle::CublasLtHandle;
 pub use matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
-pub use multiply::{matmul, tune, CublasLtMatMulDescriptor};
+pub use multiply::CublasLtMatMulDescriptor;
 
 #[cfg(test)]
 mod test;

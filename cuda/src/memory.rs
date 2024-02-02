@@ -116,6 +116,19 @@ impl DevBlob {
             _phantom: PhantomData,
         }
     }
+
+    /// # Safety
+    ///
+    /// The caller must ensure that `len` is less than or equal to the actual length of the memory,
+    /// and the context bound to this memory is currently loaded to the current thread.
+    #[inline]
+    pub unsafe fn as_slice_unchecked(&self, len: usize) -> DevSlice {
+        DevSlice {
+            ptr: self.ptr,
+            len,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 impl DevSlice<'_> {

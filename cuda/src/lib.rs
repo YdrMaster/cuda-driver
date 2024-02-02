@@ -37,11 +37,11 @@ mod stream;
 
 pub trait AsRaw {
     type Raw;
-    unsafe fn as_raw(&self) -> Self::Raw;
-}
 
-pub trait WithCtx {
-    unsafe fn ctx(&self) -> bindings::CUcontext;
+    /// # Safety
+    ///
+    /// The caller must ensure that the returned item is dropped before the original item.
+    unsafe fn as_raw(&self) -> Self::Raw;
 }
 
 #[inline(always)]
@@ -52,5 +52,5 @@ pub fn init() {
 pub use context::{Context, ContextGuard};
 pub use device::Device;
 pub use event::Event;
-pub use memory::DevBlob;
+pub use memory::{DevBlob, DevSlice};
 pub use stream::Stream;

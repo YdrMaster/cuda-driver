@@ -1,5 +1,5 @@
 ﻿use super::{rand_blob, ALPHA, BETA, K, M, N};
-use crate::{matmul, tune, CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
+use crate::{CublasLtHandle, CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
 use cuda::{AsRaw, Device};
 use std::ptr::null_mut;
 
@@ -44,9 +44,6 @@ fn general() {
         let mut ans = vec![0.0f32; M * N];
         dev_c.copy_out(&mut ans);
 
-        let mut cublaslt_handle = null_mut();
-        cublas!(cublasLtCreate(&mut cublaslt_handle));
-
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
             cols: K as _,
@@ -69,27 +66,15 @@ fn general() {
             ..Default::default()
         });
 
-        let matmul_desc = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
-        let (algo, workspace_size) = tune(
-            cublaslt_handle,
-            unsafe { matmul_desc.as_raw() },
-            &a_desc,
-            &b_desc,
-            &c_desc,
-        );
+        let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
+        let handle = CublasLtHandle::create_on(ctx);
+        let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
         let workspace = stream.malloc(workspace_size);
-        matmul(
-            cublaslt_handle,
-            unsafe { matmul_desc.as_raw() },
-            1.,
-            (&a_desc, unsafe { dev_a.as_raw() } as _),
-            (&b_desc, unsafe { dev_b.as_raw() } as _),
-            0.,
-            (&c_desc, unsafe { dev_c.as_raw() } as _),
-            algo,
-            (workspace_size, unsafe { workspace.as_raw() } as _),
-            &stream,
-        );
+        let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
+        matmul!(with handle, on stream;
+                do matmul, use algo, use workspace;
+               (1.; a_desc, dev_a; b_desc, dev_b)
+            => (0.; c_desc, dev_c; c_desc, dev_c));
 
         let mut result = vec![0.0f32; M * N];
         dev_c.copy_out(&mut result);
@@ -150,9 +135,6 @@ fn batching() {
         let mut ans = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut ans);
 
-        let mut cublaslt_handle = null_mut();
-        cublas!(cublasLtCreate(&mut cublaslt_handle));
-
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
             cols: K as _,
@@ -181,27 +163,15 @@ fn batching() {
             ..Default::default()
         });
 
-        let matmul_desc = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
-        let (algo, workspace_size) = tune(
-            cublaslt_handle,
-            unsafe { matmul_desc.as_raw() },
-            &a_desc,
-            &b_desc,
-            &c_desc,
-        );
+        let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
+        let handle = CublasLtHandle::create_on(ctx);
+        let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
         let workspace = stream.malloc(workspace_size);
-        matmul(
-            cublaslt_handle,
-            unsafe { matmul_desc.as_raw() },
-            1.,
-            (&a_desc, unsafe { dev_a.as_raw() } as _),
-            (&b_desc, unsafe { dev_b.as_raw() } as _),
-            0.,
-            (&c_desc, unsafe { dev_c.as_raw() } as _),
-            algo,
-            (workspace_size, unsafe { workspace.as_raw() } as _),
-            &stream,
-        );
+        let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
+        matmul!(with handle, on stream;
+                do matmul, use algo, use workspace;
+               (1.; a_desc, dev_a; b_desc, dev_b)
+            => (0.; c_desc, dev_c; c_desc, dev_c));
 
         let mut result = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut result);
@@ -263,9 +233,6 @@ fn broadcast() {
         let mut ans = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut ans);
 
-        let mut cublaslt_handle = null_mut();
-        cublas!(cublasLtCreate(&mut cublaslt_handle));
-
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
             cols: K as _,
@@ -294,27 +261,15 @@ fn broadcast() {
             ..Default::default()
         });
 
-        let matmul_desc = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
-        let (algo, workspace_size) = tune(
-            cublaslt_handle,
-            unsafe { matmul_desc.as_raw() },
-            &a_desc,
-            &b_desc,
-            &c_desc,
-        );
+        let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
+        let handle = CublasLtHandle::create_on(ctx);
+        let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
         let workspace = stream.malloc(workspace_size);
-        matmul(
-            cublaslt_handle,
-            unsafe { matmul_desc.as_raw() },
-            1.,
-            (&a_desc, unsafe { dev_a.as_raw() } as _),
-            (&b_desc, unsafe { dev_b.as_raw() } as _),
-            0.,
-            (&c_desc, unsafe { dev_c.as_raw() } as _),
-            algo,
-            (workspace_size, unsafe { workspace.as_raw() } as _),
-            &stream,
-        );
+        let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
+        matmul!(with handle, on stream;
+                do matmul, use algo, use workspace;
+               (1.; a_desc, dev_a; b_desc, dev_b)
+            => (0.; c_desc, dev_c; c_desc, dev_c));
 
         let mut result = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut result);

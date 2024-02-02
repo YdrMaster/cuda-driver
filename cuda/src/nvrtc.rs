@@ -9,7 +9,7 @@ use std::{
 
 static MODULES: OnceLock<Mutex<HashMap<String, Arc<Module>>>> = OnceLock::new();
 
-pub fn compile<'a, I, U, V>(code: &str, symbols: I, ctx: &ContextGuard)
+pub fn compile<I, U, V>(code: &str, symbols: I, ctx: &ContextGuard)
 where
     I: IntoIterator<Item = (U, V)>,
     U: AsRef<str>,
@@ -118,7 +118,7 @@ impl Module {
         {
             let cccl = std::option_env!("CCCL_ROOT").map_or_else(
                 || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cccl"),
-                |dir| PathBuf::from(dir),
+                PathBuf::from,
             );
             let cudacxx = cccl.join("libcudacxx/include");
             let cub = cccl.join("cub");

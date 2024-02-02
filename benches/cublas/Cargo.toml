@@ -1,5 +1,5 @@
 [package]
-name = "cublas-bench"
+name = "cublas"
 version = "0.0.0"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
@@ -7,8 +7,11 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8"
+half = "2.3"
 cuda = { path = "../../cuda" }
+
+[dev-dependencies]
+rand = "0.8"
 
 [build-dependencies]
 bindgen = "0.69"
