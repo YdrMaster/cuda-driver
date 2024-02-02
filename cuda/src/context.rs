@@ -38,6 +38,14 @@ impl Context {
     pub fn apply<T>(self: &Arc<Self>, f: impl FnOnce(&ContextGuard) -> T) -> T {
         f(&self.push())
     }
+
+    #[inline]
+    pub fn check_eq(
+        a: &impl AsRaw<Raw = cuda::CUcontext>,
+        b: &impl AsRaw<Raw = cuda::CUcontext>,
+    ) -> bool {
+        unsafe { a.as_raw() == b.as_raw() }
+    }
 }
 
 pub struct ContextGuard<'a>(&'a Arc<Context>);

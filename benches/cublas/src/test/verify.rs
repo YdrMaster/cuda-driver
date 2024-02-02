@@ -14,6 +14,7 @@ fn general() {
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(K * N, &stream);
         let dev_c = stream.malloc_for::<f32>(M * N);
+        let dev_c = dev_c.as_slice(ctx);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -41,7 +42,7 @@ fn general() {
             cublasGemmAlgo_t::CUBLAS_GEMM_DFALT,
         ));
         let mut ans = vec![0.0f32; M * N];
-        unsafe { dev_c.copy_out(&mut ans, ctx) };
+        dev_c.copy_out(&mut ans);
 
         let mut cublaslt_handle = null_mut();
         cublas!(cublasLtCreate(&mut cublaslt_handle));
@@ -91,7 +92,7 @@ fn general() {
         );
 
         let mut result = vec![0.0f32; M * N];
-        unsafe { dev_c.copy_out(&mut result, ctx) };
+        dev_c.copy_out(&mut result);
 
         let mut max = 0.0f32;
         for (a, b) in ans.iter().zip(result.iter()) {
@@ -115,6 +116,7 @@ fn batching() {
         let dev_a = rand_blob(BATCH * M * K, &stream);
         let dev_b = rand_blob(BATCH * K * N, &stream);
         let dev_c = stream.malloc_for::<f32>(BATCH * M * N);
+        let dev_c = dev_c.as_slice(ctx);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -146,7 +148,7 @@ fn batching() {
             cublasGemmAlgo_t::CUBLAS_GEMM_DFALT,
         ));
         let mut ans = vec![0.0f32; BATCH * M * N];
-        unsafe { dev_c.copy_out(&mut ans, ctx) };
+        dev_c.copy_out(&mut ans);
 
         let mut cublaslt_handle = null_mut();
         cublas!(cublasLtCreate(&mut cublaslt_handle));
@@ -202,7 +204,7 @@ fn batching() {
         );
 
         let mut result = vec![0.0f32; BATCH * M * N];
-        unsafe { dev_c.copy_out(&mut result, ctx) };
+        dev_c.copy_out(&mut result);
 
         let mut max = 0.0f32;
         for (a, b) in ans.iter().zip(result.iter()) {
@@ -229,6 +231,7 @@ fn broadcast() {
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(BATCH * K * N, &stream);
         let dev_c = stream.malloc_for::<f32>(BATCH * M * N);
+        let dev_c = dev_c.as_slice(ctx);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -258,7 +261,7 @@ fn broadcast() {
             ));
         }
         let mut ans = vec![0.0f32; BATCH * M * N];
-        unsafe { dev_c.copy_out(&mut ans, ctx) };
+        dev_c.copy_out(&mut ans);
 
         let mut cublaslt_handle = null_mut();
         cublas!(cublasLtCreate(&mut cublaslt_handle));
@@ -314,7 +317,7 @@ fn broadcast() {
         );
 
         let mut result = vec![0.0f32; BATCH * M * N];
-        unsafe { dev_c.copy_out(&mut result, ctx) };
+        dev_c.copy_out(&mut result);
 
         let mut max = 0.0f32;
         for (a, b) in ans.iter().zip(result.iter()) {

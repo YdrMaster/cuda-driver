@@ -1,15 +1,14 @@
-﻿use crate::{bindings as cuda, AsRaw, ContextGuard};
-use std::{marker::PhantomData, ptr::null_mut};
+﻿use crate::{bindings as cuda, AsRaw, Context, ContextGuard};
+use std::{ptr::null_mut, sync::Arc};
 
-#[repr(transparent)]
-pub struct Stream<'a>(cuda::CUstream, PhantomData<&'a ()>);
+pub struct Stream<'a>(cuda::CUstream, &'a ContextGuard<'a>);
 
 impl ContextGuard<'_> {
     #[inline]
     pub fn stream(&self) -> Stream {
         let mut stream = null_mut();
         driver!(cuStreamCreate(&mut stream, 0));
-        Stream(stream, PhantomData)
+        Stream(stream, self)
     }
 }
 
@@ -33,5 +32,10 @@ impl Stream<'_> {
     #[inline]
     pub fn synchronize(&self) {
         driver!(cuStreamSynchronize(self.0));
+    }
+
+    #[inline]
+    pub fn clone_ctx(&self) -> Arc<Context> {
+        self.1.clone_ctx()
     }
 }

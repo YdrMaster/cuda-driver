@@ -52,5 +52,5 @@ pub fn init() {
 pub use context::{Context, ContextGuard};
 pub use device::Device;
 pub use event::Event;
-pub use memory::DevicePtr;
+pub use memory::DevBlob;
 pub use stream::Stream;

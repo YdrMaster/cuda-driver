@@ -2,7 +2,7 @@
 use cuda::{AsRaw, Stream};
 use std::{
     ffi::c_void,
-    mem::{size_of, size_of_val, MaybeUninit},
+    mem::{size_of_val, MaybeUninit},
     ptr::null_mut,
 };
 
