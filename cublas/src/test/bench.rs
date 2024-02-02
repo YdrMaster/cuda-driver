@@ -40,7 +40,8 @@ fn general() {
 
             let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
             let handle = CublasLtHandle::create_on(ctx);
-            let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
+            let (algo, workspace_size) =
+                handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
             let workspace = stream.malloc(workspace_size);
             let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
 
@@ -142,7 +143,8 @@ fn batching() {
 
             let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
             let handle = CublasLtHandle::create_on(ctx);
-            let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
+            let (algo, workspace_size) =
+                handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
             let workspace = stream.malloc(workspace_size);
             let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
 
@@ -278,7 +280,8 @@ fn broadcast() {
 
             let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
             let handle = CublasLtHandle::create_on(ctx);
-            let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
+            let (algo, workspace_size) =
+                handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
             let workspace = stream.malloc(workspace_size);
             let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
 

@@ -50,6 +50,7 @@ impl CublasLtHandle {
         b: &CublasLtMatrix,
         c: &CublasLtMatrix,
         d: &CublasLtMatrix,
+        max_workspace: usize,
     ) -> (cu::cublasLtMatmulAlgo_t, usize) {
         let mut result = MaybeUninit::uninit();
         self.ctx.apply(|_| {
@@ -63,7 +64,7 @@ impl CublasLtHandle {
                 device,
             ));
 
-            let workspace = u64::MAX;
+            let workspace = max_workspace as u64;
             let alignment = alignment as u32;
 
             let mut preference = null_mut();

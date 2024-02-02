@@ -2,6 +2,7 @@
 use crate::{CublasLtHandle, CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
 use cuda::{AsRaw, Device};
 use std::ptr::null_mut;
+use test_utils::diff;
 
 #[test]
 fn general() {
@@ -68,7 +69,8 @@ fn general() {
 
         let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
         let handle = CublasLtHandle::create_on(ctx);
-        let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
+        let (algo, workspace_size) =
+            handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
         let workspace = stream.malloc(workspace_size);
         let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
         matmul!(with handle, on stream;
@@ -79,12 +81,8 @@ fn general() {
         let mut result = vec![0.0f32; M * N];
         dev_c.copy_out(&mut result);
 
-        let mut max = 0.0f32;
-        for (a, b) in ans.iter().zip(result.iter()) {
-            max = max.max((a - b).abs());
-        }
-        println!("max: {max}");
-        assert!(max < 1e-5);
+        let (abs_diff, _) = diff(&result, &ans);
+        assert_eq!(abs_diff, 0.);
     });
 }
 
@@ -165,7 +163,8 @@ fn batching() {
 
         let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
         let handle = CublasLtHandle::create_on(ctx);
-        let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
+        let (algo, workspace_size) =
+            handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
         let workspace = stream.malloc(workspace_size);
         let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
         matmul!(with handle, on stream;
@@ -176,12 +175,8 @@ fn batching() {
         let mut result = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut result);
 
-        let mut max = 0.0f32;
-        for (a, b) in ans.iter().zip(result.iter()) {
-            max = max.max((a - b).abs());
-        }
-        println!("max: {max}");
-        assert!(max < 1e-5);
+        let (abs_diff, _) = diff(&result, &ans);
+        assert_eq!(abs_diff, 0.);
     });
 }
 
@@ -263,7 +258,8 @@ fn broadcast() {
 
         let matmul = cublaslt_matmul!(CUBLAS_COMPUTE_32F, CUDA_R_32F);
         let handle = CublasLtHandle::create_on(ctx);
-        let (algo, workspace_size) = handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc);
+        let (algo, workspace_size) =
+            handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
         let workspace = stream.malloc(workspace_size);
         let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
         matmul!(with handle, on stream;
@@ -274,11 +270,7 @@ fn broadcast() {
         let mut result = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut result);
 
-        let mut max = 0.0f32;
-        for (a, b) in ans.iter().zip(result.iter()) {
-            max = max.max((a - b).abs());
-        }
-        println!("max: {max}");
-        assert!(max < 1e-5);
+        let (abs_diff, _) = diff(&result, &ans);
+        assert_eq!(abs_diff, 0.);
     });
 }
