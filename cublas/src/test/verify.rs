@@ -42,8 +42,8 @@ fn general() {
             cublasComputeType_t::CUBLAS_COMPUTE_32F,
             cublasGemmAlgo_t::CUBLAS_GEMM_DFALT,
         ));
-        let mut ans = vec![0.0f32; M * N];
-        dev_c.copy_out(&mut ans);
+        let mut answer = vec![0.0f32; M * N];
+        dev_c.copy_out(&mut answer);
 
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
@@ -81,7 +81,7 @@ fn general() {
         let mut result = vec![0.0f32; M * N];
         dev_c.copy_out(&mut result);
 
-        let (abs_diff, _) = diff(&result, &ans);
+        let (abs_diff, _) = diff(&result, &answer);
         assert_eq!(abs_diff, 0.);
     });
 }
@@ -130,8 +130,8 @@ fn batching() {
             cublasComputeType_t::CUBLAS_COMPUTE_32F,
             cublasGemmAlgo_t::CUBLAS_GEMM_DFALT,
         ));
-        let mut ans = vec![0.0f32; BATCH * M * N];
-        dev_c.copy_out(&mut ans);
+        let mut answer = vec![0.0f32; BATCH * M * N];
+        dev_c.copy_out(&mut answer);
 
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
@@ -175,7 +175,7 @@ fn batching() {
         let mut result = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut result);
 
-        let (abs_diff, _) = diff(&result, &ans);
+        let (abs_diff, _) = diff(&result, &answer);
         assert_eq!(abs_diff, 0.);
     });
 }
@@ -225,8 +225,8 @@ fn broadcast() {
                 cublasGemmAlgo_t::CUBLAS_GEMM_DFALT,
             ));
         }
-        let mut ans = vec![0.0f32; BATCH * M * N];
-        dev_c.copy_out(&mut ans);
+        let mut answer = vec![0.0f32; BATCH * M * N];
+        dev_c.copy_out(&mut answer);
 
         let a_desc = CublasLtMatrix::from(CublasLtMatrixLayout {
             rows: M as _,
@@ -270,7 +270,7 @@ fn broadcast() {
         let mut result = vec![0.0f32; BATCH * M * N];
         dev_c.copy_out(&mut result);
 
-        let (abs_diff, _) = diff(&result, &ans);
+        let (abs_diff, _) = diff(&result, &answer);
         assert_eq!(abs_diff, 0.);
     });
 }

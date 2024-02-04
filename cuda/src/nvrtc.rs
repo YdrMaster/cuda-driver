@@ -1,7 +1,7 @@
-﻿use crate::{bindings as cuda, Context, ContextGuard};
+﻿use crate::{bindings as cuda, AsRaw, Context, ContextGuard, Stream};
 use std::{
-    collections::{hash_map::Keys, HashMap},
-    ffi::{c_char, CStr, CString},
+    collections::HashMap,
+    ffi::{c_char, c_uint, c_void, CStr, CString},
     path::PathBuf,
     ptr::{null, null_mut},
     sync::{Arc, Mutex, OnceLock},
@@ -9,19 +9,10 @@ use std::{
 
 static MODULES: OnceLock<Mutex<HashMap<String, Arc<Module>>>> = OnceLock::new();
 
-pub fn compile<I, U, V>(code: &str, symbols: I, ctx: &ContextGuard)
-where
-    I: IntoIterator<Item = (U, V)>,
-    U: AsRef<str>,
-    V: AsRef<str>,
-{
-    let symbols = symbols
-        .into_iter()
-        .map(|(k, v)| (k.as_ref().to_owned(), v.as_ref().to_owned()))
-        .collect::<HashMap<_, _>>();
+pub fn compile(code: &str, symbols: &[&str], ctx: &ContextGuard) {
     // 先检查一遍并确保静态对象创建
     let modules = if let Some(modules) = MODULES.get() {
-        if check_hold(&modules.lock().unwrap(), symbols.keys()) {
+        if check_hold(&modules.lock().unwrap(), symbols) {
             return;
         }
         modules
@@ -34,28 +25,56 @@ where
     // 再上锁检查一遍
     let module = Arc::new(module.unwrap());
     let mut map = modules.lock().unwrap();
-    if !check_hold(&map, symbols.keys()) {
-        for k in symbols.keys() {
+    if !check_hold(&map, symbols) {
+        for k in symbols {
             // 确认指定的符号都存在
             module.get_function(k);
-            map.insert(k.clone(), module.clone());
+            map.insert(k.to_string(), module.clone());
         }
     }
 }
 
-pub fn get_function(name: &str) -> Option<cuda::CUfunction> {
-    MODULES.get().and_then(|modules| {
-        modules
-            .lock()
-            .unwrap()
-            .get(name)
-            .map(|module| module.get_function(name))
-    })
+#[repr(transparent)]
+pub struct KernelFn(cuda::CUfunction);
+
+impl KernelFn {
+    pub fn get(name: &str) -> Option<Self> {
+        MODULES.get().and_then(|modules| {
+            modules
+                .lock()
+                .unwrap()
+                .get(name)
+                .map(|module| Self(module.get_function(name)))
+        })
+    }
+
+    pub fn launch(
+        &self,
+        grid_dims: (c_uint, c_uint, c_uint),
+        block_dims: (c_uint, c_uint, c_uint),
+        params: *const *const c_void,
+        shared_mem: usize,
+        stream: Option<&Stream>,
+    ) {
+        driver!(cuLaunchKernel(
+            self.0,
+            grid_dims.0,
+            grid_dims.1,
+            grid_dims.2,
+            block_dims.0,
+            block_dims.1,
+            block_dims.2,
+            shared_mem as _,
+            stream.map_or_else(|| null_mut(), |x| x.as_raw()),
+            params as _,
+            null_mut(),
+        ));
+    }
 }
 
-fn check_hold(map: &HashMap<String, Arc<Module>>, symbols: Keys<'_, String, String>) -> bool {
+fn check_hold(map: &HashMap<String, Arc<Module>>, symbols: &[&str]) -> bool {
     let len = symbols.len();
-    let had = symbols.filter(|&k| map.contains_key(k)).count();
+    let had = symbols.iter().filter(|&&k| map.contains_key(k)).count();
     if had == len {
         true
     } else if had == 0 {
@@ -113,7 +132,6 @@ impl Module {
         let mut options = vec![
             CString::new("--std=c++17").unwrap(),
             CString::new("--gpu-architecture=compute_80").unwrap(),
-            CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap(),
         ];
         {
             let cccl = std::option_env!("CCCL_ROOT").map_or_else(
@@ -127,6 +145,7 @@ impl Module {
             options.push(CString::new(format!("-I{}\n", cudacxx.display())).unwrap());
             options.push(CString::new(format!("-I{}\n", cub.display())).unwrap());
         }
+        options.push(CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap());
         let options = options
             .iter()
             .map(|s| s.as_ptr().cast::<c_char>())
@@ -230,20 +249,7 @@ extern "C" __global__ void kernel() {
         let name = CString::new("kernel").unwrap();
         let mut function = null_mut();
         driver!(cuModuleGetFunction(&mut function, module, name.as_ptr()));
-
-        driver!(cuLaunchKernel(
-            function,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            0,
-            null_mut(),
-            null_mut(),
-            null_mut()
-        ));
+        KernelFn(function).launch((1, 1, 1), (1, 1, 1), null_mut(), 0, None);
         ctx.synchronize();
     });
 }
@@ -263,21 +269,7 @@ extern "C" __global__ void kernel() {
     dev.context().apply(|ctx| {
         let (module, _log) = Module::from_src(SRC, ctx);
         let module = module.unwrap();
-        let function = module.get_function("kernel");
-
-        driver!(cuLaunchKernel(
-            function,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            0,
-            null_mut(),
-            null_mut(),
-            null_mut()
-        ));
+        KernelFn(module.get_function("kernel")).launch((1, 1, 1), (1, 1, 1), null_mut(), 0, None);
         ctx.synchronize();
     });
 }
