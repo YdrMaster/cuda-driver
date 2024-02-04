@@ -2,7 +2,7 @@
 use std::{
     collections::HashMap,
     ffi::{c_char, CStr, CString},
-    path::PathBuf,
+    path::{Path, PathBuf},
     ptr::{null, null_mut},
     sync::{Arc, Mutex, OnceLock},
 };
@@ -90,6 +90,8 @@ impl Drop for Module {
 
 impl Module {
     fn from_src(code: &str, ctx: &ContextGuard) -> (Result<Self, cuda::nvrtcResult>, String) {
+        let need_cub = code.contains("cub");
+        let need_thrust = code.contains("thrust");
         let code = {
             let mut headers = String::new();
 
@@ -122,17 +124,22 @@ impl Module {
             CString::new("--std=c++17").unwrap(),
             CString::new("--gpu-architecture=compute_80").unwrap(),
         ];
-        {
+        fn include_dir(options: &mut Vec<CString>, dir: impl AsRef<Path>) {
+            options.push(CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap());
+        }
+        if need_cub || need_thrust {
             let cccl = std::option_env!("CCCL_ROOT").map_or_else(
                 || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cccl"),
                 PathBuf::from,
             );
-            let cudacxx = cccl.join("libcudacxx/include");
-            let cub = cccl.join("cub");
-            assert!(cudacxx.is_dir(), "cudacxx not exist");
-            assert!(cub.is_dir(), "cub not exist");
-            options.push(CString::new(format!("-I{}\n", cudacxx.display())).unwrap());
-            options.push(CString::new(format!("-I{}\n", cub.display())).unwrap());
+            assert!(cccl.is_dir(), "cccl not exist");
+            include_dir(&mut options, cccl.join("libcudacxx/include"));
+            if need_cub {
+                include_dir(&mut options, cccl.join("cub"));
+            }
+            if need_thrust {
+                include_dir(&mut options, cccl.join("thrust"));
+            }
         }
         options.push(CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap());
         let options = options
