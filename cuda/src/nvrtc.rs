@@ -35,7 +35,9 @@ impl ContextGuard<'_> {
         };
         // 编译
         let (module, log) = Module::from_src(code.as_ref(), self);
-        println!("{log}");
+        if !log.is_empty() {
+            println!("{log}");
+        }
         // 再上锁检查一遍
         let module = Arc::new(module.unwrap());
         let mut map = modules.lock().unwrap();
@@ -156,7 +158,7 @@ impl Module {
                 let mut log = vec![0u8; log_len];
                 nvrtc!(nvrtcGetProgramLog(program, log.as_mut_ptr().cast()));
                 log.pop();
-                String::from_utf8(log).unwrap()
+                std::str::from_utf8(&log).unwrap().trim().to_string()
             } else {
                 String::new()
             }

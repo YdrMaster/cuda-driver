@@ -1,9 +1,13 @@
 use cuda::{AsRaw, ContextGuard, DevSlice, KernelFn, Stream};
-use std::ffi::{c_uint, c_void};
+use std::{
+    ffi::{c_uint, c_void},
+    mem::size_of,
+};
 
 pub struct ReduceMean {
-    f: KernelFn,
-    block_size: usize,
+    padding: KernelFn,
+    folding: KernelFn,
+    block_size: c_uint,
 }
 
 impl ReduceMean {
@@ -11,20 +15,30 @@ impl ReduceMean {
         let ty_arg = "float";
         let ty_cal = "float";
         let items_per_thread = (max_item_size + block_size - 1) / block_size;
-        let name = format!("reduce_mean_{items_per_thread}_{block_size}");
+        let padding = format!("reduce_mean_padding_{block_size}");
+        let folding = format!("reduce_mean_folding_{items_per_thread}_{block_size}");
 
         const REDUCE_MEAN: &str = include_str!("templates/reduce_mean.cuh");
         let code = format!(
             r#"{REDUCE_MEAN}
 
-extern "C" __global__ void {name}(
+extern "C" __global__ void {padding}(
+    {ty_arg} const *__restrict__ x_,
+    {ty_arg}       *__restrict__ y_,
+    unsigned int const leading_dim
+){{
+    padding<{ty_cal}, {block_size}>
+    (x_, y_, leading_dim);
+}}
+
+extern "C" __global__ void {folding}(
     {ty_arg} const *__restrict__ x_,
     {ty_arg}       *__restrict__ y_,
     {ty_arg} const init,
     unsigned int const leading_dim,
     unsigned int const item_size
 ){{
-    kernel<{ty_cal}, {block_size}, {items_per_thread}>
+    folding<{ty_cal}, {block_size}, {items_per_thread}>
     (x_, y_, init, leading_dim, item_size);
 }}
 "#
@@ -32,37 +46,42 @@ extern "C" __global__ void {name}(
 
         ctx.compile(code);
         Self {
-            f: KernelFn::get(&name).unwrap(),
-            block_size,
+            padding: KernelFn::get(&padding).unwrap(),
+            folding: KernelFn::get(&folding).unwrap(),
+            block_size: block_size as _,
         }
     }
 
-    pub fn launch(&self, x: &DevSlice, y: &DevSlice, item_len: usize, stream: &Stream) {
-        let row = y.len();
-        let leading_dim = x.len() / row;
-        debug_assert_eq!(x.len() % row, 0);
-
+    pub fn launch(&self, x: &DevSlice, y: &DevSlice, items_len: usize, stream: &Stream) {
+        let row = (y.len() / size_of::<f32>()) as c_uint;
+        let leading_dim = (x.len() / y.len()) as c_uint;
         let x_ptr = unsafe { x.as_raw() };
         let y_ptr = unsafe { y.as_raw() };
-        let init = 0.0f32;
-        let leading_dim = leading_dim as c_uint;
-        let item_len = item_len as c_uint;
-        let params: &[*const c_void] = &[
-            (&x_ptr) as *const _ as _,
-            (&y_ptr) as *const _ as _,
-            (&init) as *const _ as _,
-            (&leading_dim) as *const _ as _,
-            (&item_len) as *const _ as _,
-        ];
-        self.f.launch(
-            row as c_uint,
-            self.block_size as c_uint,
-            params.as_ptr(),
-            0,
-            Some(&stream),
-        );
+        let items_len = items_len as c_uint;
+        if items_len <= self.block_size {
+            let params: [*const c_void; 3] = [
+                (&x_ptr) as *const _ as _,
+                (&y_ptr) as *const _ as _,
+                (&leading_dim) as *const _ as _,
+            ];
+            self.padding
+                .launch(row, items_len, params.as_ptr(), 0, Some(stream));
+        } else {
+            let params: [*const c_void; 5] = [
+                (&x_ptr) as *const _ as _,
+                (&y_ptr) as *const _ as _,
+                (&0.0f32) as *const _ as _,
+                (&leading_dim) as *const _ as _,
+                (&items_len) as *const _ as _,
+            ];
+            self.folding
+                .launch(row, self.block_size, params.as_ptr(), 0, Some(stream));
+        }
     }
 }
+
+#[cfg(test)]
+mod bench;
 
 #[cfg(test)]
 mod test {
@@ -70,6 +89,7 @@ mod test {
     use cuda::{AsRaw, KernelFn};
     use rand::Rng;
     use std::ffi::{c_uint, c_void};
+    use test_utils::diff;
 
     /// 计算 reduceMean 并与 kernel 函数的结果进行比较。
     fn check(data: &[f32], result: &[f32], item_len: usize) -> (f64, f64) {
