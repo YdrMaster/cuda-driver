@@ -10,37 +10,52 @@ impl ReduceMean {
     pub fn new(max_item_size: usize, block_size: usize, ctx: &ContextGuard) -> Self {
         let ty_arg = "float";
         let ty_cal = "float";
-        let item_per_thread = (max_item_size + block_size - 1) / block_size;
-        let name = format!("reduce_mean_{item_per_thread}_{block_size}");
-        let code = format!(
-            r#"
+        let items_per_thread = (max_item_size + block_size - 1) / block_size;
+        let name = format!("reduce_mean_{items_per_thread}_{block_size}");
+
+        const TEMPLATE: &str = "\
 #include <cub/block/block_load.cuh>
 #include <cub/block/block_reduce.cuh>
+
+template <class Tcompute, auto BLOCK_SIZE, auto ITEMS_PER_THREAD, class Tdata>
+static __device__ void kernel(
+    Tdata const *__restrict__ x_,
+    Tdata       *__restrict__ y_,
+    Tdata const init,
+    unsigned int const leading_dim,
+    unsigned int const item_size
+) {
+    auto x = x_ + blockIdx.x * leading_dim;
+    auto y = y_ + blockIdx.x;
+
+    Tcompute thread_data[ITEMS_PER_THREAD];
+    {
+        using BlockOp = cub::BlockLoad<Tcompute, BLOCK_SIZE, ITEMS_PER_THREAD>;
+        __shared__ typename BlockOp::TempStorage temp_storage;
+        BlockOp(temp_storage).Load(x, thread_data, item_size, init);
+    }
+    Tcompute acc;
+    {
+        using BlockOp = cub::BlockReduce<Tcompute, BLOCK_SIZE>;
+        __shared__ typename BlockOp::TempStorage temp_storage;
+        acc = BlockOp(temp_storage).Reduce(thread_data, cub::Sum());
+    }
+
+    if (threadIdx.x == 0) *y = Tdata(acc / Tcompute(item_size));
+}";
+
+        let code = format!(
+            r#"{TEMPLATE}
 
 extern "C" __global__ void {name}(
     {ty_arg} const *__restrict__ x_,
     {ty_arg}       *__restrict__ y_,
-    {ty_arg} init,
-    unsigned int leading_dim,
-    unsigned int item_size
-) {{
-    auto x = x_ + blockIdx.x * leading_dim;
-    auto y = y_ + blockIdx.x;
-
-    {ty_cal} thread_data[{item_per_thread}];
-    {{
-        using BlockLoad = cub::BlockLoad<{ty_cal}, {block_size}, {item_per_thread}>;
-        __shared__ typename BlockLoad::TempStorage temp_storage;
-        BlockLoad(temp_storage).Load(x, thread_data, item_size, init);
-    }}
-    {ty_cal} acc;
-    {{
-        using BlockReduce = cub::BlockReduce<{ty_cal}, {block_size}>;
-        __shared__ typename BlockReduce::TempStorage temp_storage;
-        acc = BlockReduce(temp_storage).Reduce(thread_data, cub::Sum());
-    }}
-
-    if (threadIdx.x == 0) *y = {ty_arg}(acc / {ty_cal}(item_size));
+    {ty_arg} const init,
+    unsigned int const leading_dim,
+    unsigned int const item_size
+){{
+    kernel<{ty_cal}, {block_size}, {items_per_thread}>
+    (x_, y_, init, leading_dim, item_size);
 }}
 "#
         );
