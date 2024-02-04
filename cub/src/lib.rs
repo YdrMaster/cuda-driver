@@ -14,6 +14,7 @@ impl ReduceMean {
         let name = format!("reduce_mean_{item_per_thread}_{block_size}");
         let code = format!(
             r#"
+#include <cub/block/block_load.cuh>
 #include <cub/block/block_reduce.cuh>
 
 extern "C" __global__ void {name}(
@@ -27,13 +28,17 @@ extern "C" __global__ void {name}(
     auto y = y_ + blockIdx.x;
 
     {ty_cal} thread_data[{item_per_thread}];
-    for (unsigned int i = threadIdx.x, j = 0; j < {item_per_thread}; i += blockDim.x, ++j) {{
-        thread_data[j] = {ty_cal}(i < item_size ? x[i] : init);
+    {{
+        using BlockLoad = cub::BlockLoad<{ty_cal}, {block_size}, {item_per_thread}>;
+        __shared__ typename BlockLoad::TempStorage temp_storage;
+        BlockLoad(temp_storage).Load(x, thread_data, item_size, init);
     }}
-
-    using BlockReduce = cub::BlockReduce<{ty_cal}, {block_size}>;
-    __shared__ typename BlockReduce::TempStorage tempStorage;
-    auto acc = BlockReduce(tempStorage).Reduce(thread_data, cub::Sum());
+    {ty_cal} acc;
+    {{
+        using BlockReduce = cub::BlockReduce<{ty_cal}, {block_size}>;
+        __shared__ typename BlockReduce::TempStorage temp_storage;
+        acc = BlockReduce(temp_storage).Reduce(thread_data, cub::Sum());
+    }}
 
     if (threadIdx.x == 0) *y = {ty_arg}(acc / {ty_cal}(item_size));
 }}
