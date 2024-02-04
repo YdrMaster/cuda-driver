@@ -9,27 +9,42 @@ use std::{
 
 static MODULES: OnceLock<Mutex<HashMap<String, Arc<Module>>>> = OnceLock::new();
 
-pub fn compile(code: &str, symbols: &[&str], ctx: &ContextGuard) {
-    // 先检查一遍并确保静态对象创建
-    let modules = if let Some(modules) = MODULES.get() {
-        if check_hold(&modules.lock().unwrap(), symbols) {
-            return;
-        }
-        modules
-    } else {
-        MODULES.get_or_init(Default::default)
-    };
-    // 编译
-    let (module, log) = Module::from_src(code, ctx);
-    println!("{log}");
-    // 再上锁检查一遍
-    let module = Arc::new(module.unwrap());
-    let mut map = modules.lock().unwrap();
-    if !check_hold(&map, symbols) {
-        for k in symbols {
-            // 确认指定的符号都存在
-            module.get_function(k);
-            map.insert(k.to_string(), module.clone());
+impl ContextGuard<'_> {
+    pub fn compile(&self, code: impl AsRef<str>) {
+        let symbols = {
+            let mut symbols = Vec::new();
+            let mut code = code.as_ref();
+            while let Some(pos) = code.find("extern \"C\"") {
+                let seg = &code[pos..];
+                let (head, tail) = seg.split_at(seg.find('(').unwrap());
+                let name = head.split_whitespace().last().unwrap();
+                code = tail;
+                symbols.push(name);
+            }
+            symbols
+        };
+        assert!(!symbols.is_empty(), "no symbol found");
+        // 先检查一遍并确保静态对象创建
+        let modules = if let Some(modules) = MODULES.get() {
+            if check_hold(&modules.lock().unwrap(), &symbols) {
+                return;
+            }
+            modules
+        } else {
+            MODULES.get_or_init(Default::default)
+        };
+        // 编译
+        let (module, log) = Module::from_src(code.as_ref(), self);
+        println!("{log}");
+        // 再上锁检查一遍
+        let module = Arc::new(module.unwrap());
+        let mut map = modules.lock().unwrap();
+        if !check_hold(&map, &symbols) {
+            for k in symbols {
+                // 确认指定的符号都存在
+                module.get_function(k);
+                map.insert(k.to_string(), module.clone());
+            }
         }
     }
 }

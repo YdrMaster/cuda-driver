@@ -1,4 +1,4 @@
-use cuda::{nvrtc::compile, AsRaw, ContextGuard, DevSlice, KernelFn, Stream};
+use cuda::{AsRaw, ContextGuard, DevSlice, KernelFn, Stream};
 use std::ffi::{c_uint, c_void};
 
 pub struct ReduceMean {
@@ -30,7 +30,7 @@ extern "C" __global__ void {name}(
 "#
         );
 
-        compile(&code, &[&name], ctx);
+        ctx.compile(code);
         Self {
             f: KernelFn::get(&name).unwrap(),
             block_size,
@@ -67,7 +67,7 @@ extern "C" __global__ void {name}(
 #[cfg(test)]
 mod test {
     use super::ReduceMean;
-    use cuda::{nvrtc::compile, AsRaw, KernelFn};
+    use cuda::{AsRaw, KernelFn};
     use rand::Rng;
     use std::ffi::{c_uint, c_void};
 
@@ -115,7 +115,7 @@ extern "C" __global__ void {name}(
             return;
         };
         dev.context().apply(|ctx| {
-            compile(&code, &[&name], ctx);
+            ctx.compile(code);
             let function = KernelFn::get(&name).unwrap();
 
             let stream = ctx.stream();
@@ -181,7 +181,7 @@ extern "C" __global__ void {name}(
             return;
         };
         dev.context().apply(|ctx| {
-            compile(&code, &[&name], ctx);
+            ctx.compile(code);
             let function = KernelFn::get(&name).unwrap();
 
             let stream = ctx.stream();
