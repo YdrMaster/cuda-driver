@@ -1,7 +1,7 @@
-﻿use crate::{bindings as cuda, AsRaw, Context, ContextGuard, Stream};
+﻿use crate::{bindings as cuda, launch::KernelFn, Context, ContextGuard};
 use std::{
     collections::HashMap,
-    ffi::{c_char, c_uint, c_void, CStr, CString},
+    ffi::{c_char, CStr, CString},
     path::PathBuf,
     ptr::{null, null_mut},
     sync::{Arc, Mutex, OnceLock},
@@ -34,9 +34,6 @@ pub fn compile(code: &str, symbols: &[&str], ctx: &ContextGuard) {
     }
 }
 
-#[repr(transparent)]
-pub struct KernelFn(cuda::CUfunction);
-
 impl KernelFn {
     pub fn get(name: &str) -> Option<Self> {
         MODULES.get().and_then(|modules| {
@@ -46,29 +43,6 @@ impl KernelFn {
                 .get(name)
                 .map(|module| Self(module.get_function(name)))
         })
-    }
-
-    pub fn launch(
-        &self,
-        grid_dims: (c_uint, c_uint, c_uint),
-        block_dims: (c_uint, c_uint, c_uint),
-        params: *const *const c_void,
-        shared_mem: usize,
-        stream: Option<&Stream>,
-    ) {
-        driver!(cuLaunchKernel(
-            self.0,
-            grid_dims.0,
-            grid_dims.1,
-            grid_dims.2,
-            block_dims.0,
-            block_dims.1,
-            block_dims.2,
-            shared_mem as _,
-            stream.map_or_else(|| null_mut(), |x| x.as_raw()),
-            params as _,
-            null_mut(),
-        ));
     }
 }
 
@@ -249,7 +223,7 @@ extern "C" __global__ void kernel() {
         let name = CString::new("kernel").unwrap();
         let mut function = null_mut();
         driver!(cuModuleGetFunction(&mut function, module, name.as_ptr()));
-        KernelFn(function).launch((1, 1, 1), (1, 1, 1), null_mut(), 0, None);
+        KernelFn(function).launch((), (), null_mut(), 0, None);
         ctx.synchronize();
     });
 }
@@ -269,7 +243,7 @@ extern "C" __global__ void kernel() {
     dev.context().apply(|ctx| {
         let (module, _log) = Module::from_src(SRC, ctx);
         let module = module.unwrap();
-        KernelFn(module.get_function("kernel")).launch((1, 1, 1), (1, 1, 1), null_mut(), 0, None);
+        KernelFn(module.get_function("kernel")).launch((), (), null_mut(), 0, None);
         ctx.synchronize();
     });
 }

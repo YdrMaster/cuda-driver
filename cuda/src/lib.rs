@@ -31,6 +31,7 @@ pub mod bindings {
 mod context;
 mod device;
 mod event;
+mod launch;
 mod memory;
 pub mod nvrtc;
 mod stream;
@@ -52,5 +53,6 @@ pub fn init() {
 pub use context::{Context, ContextGuard};
 pub use device::Device;
 pub use event::Event;
+pub use launch::KernelFn;
 pub use memory::{DevBlob, DevSlice};
 pub use stream::Stream;
