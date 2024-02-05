@@ -3,7 +3,7 @@
 
 // assert BLOCK_SIZE >= blockDim.x
 template<unsigned int BLOCK_SIZE, class Tdata>
-static __forceinline__ __device__ void padding(
+static __device__ void padding(
     Tdata *__restrict__ y_,
     Tdata const *__restrict__ x_,
     Tdata const *__restrict__ w_,
@@ -27,7 +27,7 @@ static __forceinline__ __device__ void padding(
 }
 
 template<unsigned int BLOCK_SIZE, unsigned int ITEMS_PER_THREAD, class Tdata>
-static __forceinline__ __device__ void folding(
+static __device__ void folding(
     Tdata *__restrict__ y_,
     Tdata const *__restrict__ x_,
     Tdata const *__restrict__ w,
