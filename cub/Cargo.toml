@@ -11,3 +11,6 @@ cuda = { path = "../cuda" }
 [dev-dependencies]
 rand = "0.8"
 test-utils = { path = "../test-utils" }
+
+[build-dependencies]
+find_cuda_helper = "0.2"

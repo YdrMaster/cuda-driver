@@ -1,4 +1,4 @@
-﻿use crate::ReduceMean;
+﻿use super::ReduceMean;
 use rand::Rng;
 
 /// 计算 reduceMean 并与 kernel 函数的结果进行比较。

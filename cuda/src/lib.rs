@@ -56,3 +56,35 @@ pub use event::Event;
 pub use launch::KernelFn;
 pub use memory::{DevBlob, DevSlice};
 pub use stream::Stream;
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum CudaDataType {
+    half,
+    nv_bfloat16,
+    float,
+    double,
+}
+
+impl CudaDataType {
+    #[inline]
+    pub fn size(self) -> usize {
+        match self {
+            Self::half => 2,
+            Self::nv_bfloat16 => 2,
+            Self::float => 4,
+            Self::double => 8,
+        }
+    }
+
+    #[inline]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::half => "half",
+            Self::nv_bfloat16 => "nv_bfloat16",
+            Self::float => "float",
+            Self::double => "double",
+        }
+    }
+}

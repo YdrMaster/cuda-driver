@@ -1,4 +1,4 @@
-﻿use crate::ReduceMean;
+﻿use super::ReduceMean;
 use cuda::{AsRaw, KernelFn};
 use rand::Rng;
 use std::ffi::{c_uint, c_void};
@@ -33,7 +33,6 @@ fn bench() {
             let name = "reduce_mean_bench";
             let code = format!(
                 r#"
-#include <cub/block/block_load.cuh>
 #include <cub/block/block_reduce.cuh>
 
 extern "C" __global__ void {name}(
@@ -42,19 +41,14 @@ extern "C" __global__ void {name}(
 ) {{
     auto x = x_ + blockIdx.x * {COL};
     auto y = y_ + blockIdx.x;
-    float val[1];
-    {{
-        using BlockOp = cub::BlockLoad<float, {VALID}, 1>;
-        __shared__ typename BlockOp::TempStorage temp_storage;
-        BlockOp(temp_storage).Load(x, val);
-    }}
-    {{
-        using BlockReduce = cub::BlockReduce<float, {VALID}>;
-        __shared__ typename BlockReduce::TempStorage temp_storage;
-        *val = BlockReduce(temp_storage).Reduce(*val, cub::Sum());
-    }}
 
-    if (threadIdx.x == 0) *y = *val / {VALID};
+    using BlockOp = cub::BlockReduce<float, {VALID}>;
+    __shared__ typename BlockOp::TempStorage temp_storage;
+    auto acc = BlockOp(temp_storage).Reduce(x[threadIdx.x], cub::Sum());
+
+    if (threadIdx.x == 0) {{
+        *y = acc / float(blockDim.x);
+    }}
 }}
 "#
             );
