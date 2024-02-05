@@ -25,7 +25,7 @@ impl KernelFn {
             block_dims.y(),
             block_dims.z(),
             shared_mem as _,
-            stream.map_or_else(|| null_mut(), |x| x.as_raw()),
+            stream.map_or(null_mut(), |x| x.as_raw()),
             params as _,
             null_mut(),
         ));

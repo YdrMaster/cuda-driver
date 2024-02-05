@@ -3,10 +3,7 @@ use rand::Rng;
 use std::ffi::{c_uint, c_void};
 use test_utils::diff;
 
-struct Softmax {
-    baseline: KernelFn,
-    block_size: c_uint,
-}
+struct Softmax(KernelFn);
 
 impl Softmax {
     pub fn new(
@@ -46,19 +43,53 @@ extern "C" __global__ void {baseline}(
         case 5:
             softmax5<{block_size}>(x, leading_dim);
             break;
-        default:
-            exit(algo);
     }}
 }}
 "#
         );
 
         ctx.compile(code);
-        Self {
-            baseline: KernelFn::get(baseline).unwrap(),
-            block_size: block_size as _,
-        }
+        Self(KernelFn::get(baseline).unwrap())
     }
+}
+
+#[test]
+fn once() {
+    const ROW: usize = 4096;
+    const COL: usize = 1024;
+
+    cuda::init();
+    let Some(dev) = cuda::Device::fetch() else {
+        return;
+    };
+    dev.context().apply(|ctx| {
+        let stream = ctx.stream();
+        let mut rng = rand::thread_rng();
+        let mut x_data = vec![0.0f32; ROW * COL];
+        rng.fill(&mut x_data[..]);
+        let x = stream.from_slice(&x_data);
+        let x = x.as_slice(ctx);
+
+        let softmax = Softmax::new(CudaDataType::float, COL, COL, ctx);
+        let x_ptr = unsafe { x.as_raw() };
+        let leading_dim = COL as c_uint;
+
+        for _ in 0..10 {
+            let algo = 0 as c_uint;
+            let params: [*const c_void; 3] = [
+                (&x_ptr) as *const _ as _,
+                (&leading_dim) as *const _ as _,
+                (&algo) as *const _ as _,
+            ];
+            softmax.0.launch(
+                ROW as c_uint,
+                COL as c_uint,
+                params.as_ptr(),
+                COL,
+                Some(&stream),
+            );
+        }
+    });
 }
 
 #[test]
@@ -96,7 +127,7 @@ fn bench() {
                 (&leading_dim) as *const _ as _,
                 (&algo) as *const _ as _,
             ];
-            softmax.baseline.launch(
+            softmax.0.launch(
                 ROW as c_uint,
                 COL as c_uint,
                 params.as_ptr(),
