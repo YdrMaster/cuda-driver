@@ -28,14 +28,14 @@ static __device__ void padding(
 
 template<unsigned int BLOCK_SIZE, unsigned int ITEMS_PER_THREAD, class Tdata>
 static __device__ void folding(
-    Tdata *__restrict__ y_,
-    Tdata const *__restrict__ x_,
+    Tdata *__restrict__ y,
+    Tdata const *__restrict__ x,
     Tdata const *__restrict__ w,
     float const epsilon,
     unsigned int const leading_dim,
     unsigned int const items_size) {
-    auto y = y_ + blockIdx.x * leading_dim;
-    auto x = x_ + blockIdx.x * leading_dim;
+    y += blockIdx.x * leading_dim;
+    x += blockIdx.x * leading_dim;
 
     float thread_data[ITEMS_PER_THREAD];
     {

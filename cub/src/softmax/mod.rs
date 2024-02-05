@@ -1,6 +1,5 @@
-﻿use cuda::{ContextGuard, CudaDataType, KernelFn, Stream};
+﻿use cuda::{ContextGuard, CudaDataType, KernelFn};
 use std::ffi::c_uint;
-use test_utils::diff;
 
 pub struct Softmax {
     baseline: KernelFn,
@@ -39,6 +38,12 @@ extern "C" __global__ void {baseline}(
         case 3:
             softmax3<{block_size}>(x, leading_dim);
             break;
+        case 4:
+            softmax4<{block_size}>(x, leading_dim);
+            break;
+        case 5:
+            softmax5<{block_size}>(x, leading_dim);
+            break;
     }}
 }}
 "#
@@ -54,9 +59,10 @@ extern "C" __global__ void {baseline}(
 
 #[test]
 fn bench() {
-    use cuda::AsRaw;
+    use cuda::{AsRaw, Stream};
     use rand::Rng;
     use std::ffi::c_void;
+    use test_utils::diff;
 
     const ROW: usize = 4096;
     const COL: usize = 1024;
@@ -66,6 +72,8 @@ fn bench() {
         return;
     };
     let mut results = [
+        vec![0.0f32; ROW * COL],
+        vec![0.0f32; ROW * COL],
         vec![0.0f32; ROW * COL],
         vec![0.0f32; ROW * COL],
         vec![0.0f32; ROW * COL],
@@ -98,7 +106,7 @@ fn bench() {
             )
         };
 
-        for algo in 0..=3 {
+        for algo in 0..=5 {
             let ela = stream.bench(|_, stream| f(algo, stream), 10000, 10);
             x.copy_out(&mut results[algo as usize]);
             println!("softmax{algo}: {ela:?}");
