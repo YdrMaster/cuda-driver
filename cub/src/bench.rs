@@ -1,9 +1,8 @@
-﻿use cuda::{AsRaw, KernelFn};
+﻿use crate::ReduceMean;
+use cuda::{AsRaw, KernelFn};
 use rand::Rng;
 use std::ffi::{c_uint, c_void};
 use test_utils::diff;
-
-use crate::ReduceMean;
 
 #[test]
 fn bench() {
@@ -16,9 +15,11 @@ fn bench() {
     let Some(dev) = cuda::Device::fetch() else {
         return;
     };
-    let mut result0 = vec![0.0f32; ROW];
-    let mut result1 = vec![0.0f32; ROW];
+
     dev.context().apply(|ctx| {
+        let mut result0 = vec![0.0f32; ROW];
+        let mut result1 = vec![0.0f32; ROW];
+
         let stream = ctx.stream();
         let mut rng = rand::thread_rng();
         let mut x_data = vec![0.0f32; ROW * COL];
@@ -76,19 +77,13 @@ extern "C" __global__ void {name}(
                 10000,
                 10,
             );
-            println!("ela: {ela:?}");
+            println!("dynamic: {ela:?}");
             y.copy_out(&mut result0);
         }
         {
             let kernel = ReduceMean::new(COL, BLOCK_SIZE, ctx);
-            let ela = stream.bench(
-                |_, stream| {
-                    kernel.launch(&x, &y, VALID, stream);
-                },
-                10000,
-                10,
-            );
-            println!("ela: {ela:?}");
+            let ela = stream.bench(|_, stream| kernel.launch(&x, &y, VALID, stream), 10000, 10);
+            println!("static: {ela:?}");
             y.copy_out(&mut result1);
         }
         let diff = diff(&result0, &result1);
