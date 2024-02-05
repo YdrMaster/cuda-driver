@@ -1,5 +1,6 @@
 ﻿use cuda::{ContextGuard, CudaDataType, KernelFn, Stream};
 use std::ffi::c_uint;
+use test_utils::diff;
 
 pub struct Softmax {
     baseline: KernelFn,
@@ -35,6 +36,9 @@ extern "C" __global__ void {baseline}(
         case 2:
             softmax2<{block_size}>(x, leading_dim);
             break;
+        case 3:
+            softmax3<{block_size}>(x, leading_dim);
+            break;
     }}
 }}
 "#
@@ -61,6 +65,12 @@ fn bench() {
     let Some(dev) = cuda::Device::fetch() else {
         return;
     };
+    let mut results = [
+        vec![0.0f32; ROW * COL],
+        vec![0.0f32; ROW * COL],
+        vec![0.0f32; ROW * COL],
+        vec![0.0f32; ROW * COL],
+    ];
     dev.context().apply(|ctx| {
         let stream = ctx.stream();
         let mut rng = rand::thread_rng();
@@ -88,9 +98,13 @@ fn bench() {
             )
         };
 
-        for algo in 0..=2 {
+        for algo in 0..=3 {
             let ela = stream.bench(|_, stream| f(algo, stream), 10000, 10);
+            x.copy_out(&mut results[algo as usize]);
             println!("softmax{algo}: {ela:?}");
+        }
+        for i in 1..=3 {
+            println!("softmax{i}: {:?}", diff(&results[i], &results[0]));
         }
     });
 }
