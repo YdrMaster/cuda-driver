@@ -1,5 +1,18 @@
 #include <cub/block/block_reduce.cuh>
 
+struct AttentionCausualMask {
+    __forceinline__ __device__ bool
+    operator()(int tokenId, int seqLen,
+               int posId, int attLen) {
+        // tokenId ↓ |<---attLen---->|
+        //         0 | * * ... *     |
+        //         1 | * * ... * *   |
+        //         2 | * * ... * * * |
+        // seqLen: 3 |---------------|
+        return attLen + tokenId >= posId + seqLen;
+    }
+};
+
 // assert BLOCK_SIZE >= blockDim.x
 template<unsigned int BLOCK_SIZE, class Tdata, class Tmask>
 static __device__ void padding(
