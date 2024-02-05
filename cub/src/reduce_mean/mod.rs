@@ -46,8 +46,8 @@ extern "C" __global__ void {folding}(
 
         ctx.compile(code);
         Self {
-            padding: KernelFn::get(&padding).unwrap(),
-            folding: KernelFn::get(&folding).unwrap(),
+            padding: KernelFn::get(padding).unwrap(),
+            folding: KernelFn::get(folding).unwrap(),
             block_size: block_size as _,
             items_per_thread: items_per_thread as _,
         }
@@ -59,21 +59,16 @@ extern "C" __global__ void {folding}(
         let x_ptr = unsafe { x.as_raw() };
         let y_ptr = unsafe { y.as_raw() };
         let items_len = items_len as c_uint;
+        let params: [*const c_void; 4] = [
+            (&x_ptr) as *const _ as _,
+            (&y_ptr) as *const _ as _,
+            (&leading_dim) as *const _ as _,
+            (&items_len) as *const _ as _,
+        ];
         if items_len <= self.block_size {
-            let params: [*const c_void; 3] = [
-                (&x_ptr) as *const _ as _,
-                (&y_ptr) as *const _ as _,
-                (&leading_dim) as *const _ as _,
-            ];
             self.padding
                 .launch(row, items_len, params.as_ptr(), 0, Some(stream));
         } else {
-            let params: [*const c_void; 4] = [
-                (&x_ptr) as *const _ as _,
-                (&y_ptr) as *const _ as _,
-                (&leading_dim) as *const _ as _,
-                (&items_len) as *const _ as _,
-            ];
             let block_size = (items_len + self.items_per_thread - 1) / self.items_per_thread;
             self.folding
                 .launch(row, block_size, params.as_ptr(), 0, Some(stream));

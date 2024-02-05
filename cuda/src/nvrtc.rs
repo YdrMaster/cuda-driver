@@ -52,7 +52,8 @@ impl ContextGuard<'_> {
 }
 
 impl KernelFn {
-    pub fn get(name: &str) -> Option<Self> {
+    pub fn get(name: impl AsRef<str>) -> Option<Self> {
+        let name = name.as_ref();
         MODULES.get().and_then(|modules| {
             modules
                 .lock()

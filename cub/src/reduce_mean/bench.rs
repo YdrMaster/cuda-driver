@@ -53,7 +53,7 @@ extern "C" __global__ void {name}(
 "#
             );
             ctx.compile(code);
-            let f = KernelFn::get(&name).unwrap();
+            let f = KernelFn::get(name).unwrap();
             let x_ptr = unsafe { x.as_raw() };
             let y_ptr = unsafe { y.as_raw() };
             let params: [*const c_void; 2] = [(&x_ptr) as *const _ as _, (&y_ptr) as *const _ as _];

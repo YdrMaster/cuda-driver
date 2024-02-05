@@ -6,4 +6,4 @@ mod rms_normalization;
 mod softmax;
 
 pub use rms_normalization::RmsNormalization;
-pub use softmax::Softmax;
+pub use softmax::FusedSoftmax;
