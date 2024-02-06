@@ -13,20 +13,15 @@ struct AttentionCausualMask {
     }
 };
 
-// assert BLOCK_SIZE >= blockDim.x
 template<unsigned int BLOCK_SIZE, class Tdata, class Tmask>
-static __device__ void padding(
+static __device__ void block_padding(
     Tdata *__restrict__ att,
     Tmask mask,
-    unsigned int const max_seq_len,
-    unsigned int const buf_len) {
-    auto batch_idx = blockIdx.x,
-         token_idx = blockIdx.y,
-         seq_len = gridDim.y,
-         att_idx = threadIdx.x,
-         att_len = blockDim.x;
+    unsigned int const token_idx,
+    unsigned int const seq_len,
+    unsigned int const att_len) {
 
-    att += (batch_idx * max_seq_len + token_idx) * buf_len;
+    auto att_idx = threadIdx.x;
     auto thread_data = mask(token_idx, seq_len, att_idx, att_len)
                            ? float(att[att_idx])
                            : -__FLT_MAX__;
@@ -53,18 +48,15 @@ static __device__ void padding(
 }
 
 template<unsigned int BLOCK_SIZE, unsigned int ITEMS_PER_THREAD, class Tdata, class Tmask>
-static __device__ void folding(
+static __device__ void block_folding(
     Tdata *__restrict__ att,
     Tmask mask,
-    unsigned int const max_seq_len,
-    unsigned int const buf_len,
+    unsigned int const token_idx,
+    unsigned int const seq_len,
     unsigned int const att_len) {
-    auto batch_idx = blockIdx.x,
-         token_idx = blockIdx.y,
-         seq_len = gridDim.y;
 
     auto thread_offset = threadIdx.x * ITEMS_PER_THREAD;
-    att += (batch_idx * max_seq_len + token_idx) * buf_len + thread_offset;
+    att += thread_offset;
 
     float thread_data[ITEMS_PER_THREAD];
 #pragma unroll
@@ -103,4 +95,43 @@ static __device__ void folding(
             att[i] = Tdata(thread_data[i] * mean);
         }
     }
+}
+
+// assert BLOCK_SIZE >= blockDim.x
+template<unsigned int BLOCK_SIZE, class Tdata, class Tmask>
+static __forceinline__ __device__ void padding(
+    Tdata *__restrict__ att,
+    Tmask mask,
+    unsigned int const max_seq_len,
+    unsigned int const buf_len) {
+    auto batch_idx = blockIdx.x,
+         token_idx = blockIdx.y,
+         seq_len = gridDim.y,
+         att_len = blockDim.x;
+
+    block_padding<BLOCK_SIZE>(
+        att + (batch_idx * max_seq_len + token_idx) * buf_len,
+        mask,
+        token_idx,
+        seq_len,
+        att_len);
+}
+
+template<unsigned int BLOCK_SIZE, unsigned int ITEMS_PER_THREAD, class Tdata, class Tmask>
+static __forceinline__ __device__ void folding(
+    Tdata *__restrict__ att,
+    Tmask mask,
+    unsigned int const max_seq_len,
+    unsigned int const buf_len,
+    unsigned int const att_len) {
+    auto batch_idx = blockIdx.x,
+         token_idx = blockIdx.y,
+         seq_len = gridDim.y;
+
+    block_folding<BLOCK_SIZE, ITEMS_PER_THREAD>(
+        att + (batch_idx * max_seq_len + token_idx) * buf_len,
+        mask,
+        token_idx,
+        seq_len,
+        att_len);
 }
