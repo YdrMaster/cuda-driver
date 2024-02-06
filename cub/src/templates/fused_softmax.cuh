@@ -2,14 +2,14 @@
 
 struct AttentionCausualMask {
     __forceinline__ __device__ bool
-    operator()(int tokenId, int seqLen,
-               int posId, int attLen) {
-        // tokenId ↓ |<---attLen---->|
-        //         0 | * * ... *     |
-        //         1 | * * ... * *   |
-        //         2 | * * ... * * * |
-        // seqLen: 3 |---------------|
-        return attLen + tokenId >= posId + seqLen;
+    operator()(int tok_id, int seq_len,
+               int pos_id, int att_len) {
+        //   tok_id ↓ |<---att_len--->|
+        //          0 | * * ... *     |
+        //          1 | * * ... * *   |
+        //          2 | * * ... * * * |
+        // seq_len: 3 |---------------|
+        return att_len + tok_id >= pos_id + seq_len;
     }
 };
 
@@ -18,14 +18,15 @@ template<unsigned int BLOCK_SIZE, class Tdata, class Tmask>
 static __device__ void padding(
     Tdata *__restrict__ att,
     Tmask mask,
-    unsigned int const leading_dim) {
+    unsigned int const max_seq_len,
+    unsigned int const buf_len) {
     auto batch_idx = blockIdx.x,
          token_idx = blockIdx.y,
          seq_len = gridDim.y,
          att_idx = threadIdx.x,
          att_len = blockDim.x;
 
-    att += (batch_idx * seq_len + token_idx) * leading_dim;
+    att += (batch_idx * max_seq_len + token_idx) * buf_len;
     auto thread_data = mask(token_idx, seq_len, att_idx, att_len)
                            ? float(att[att_idx])
                            : -__FLT_MAX__;
@@ -55,14 +56,15 @@ template<unsigned int BLOCK_SIZE, unsigned int ITEMS_PER_THREAD, class Tdata, cl
 static __device__ void folding(
     Tdata *__restrict__ att,
     Tmask mask,
-    unsigned int const leading_dim,
+    unsigned int const max_seq_len,
+    unsigned int const buf_len,
     unsigned int const att_len) {
     auto batch_idx = blockIdx.x,
          token_idx = blockIdx.y,
          seq_len = gridDim.y;
 
     auto thread_offset = threadIdx.x * ITEMS_PER_THREAD;
-    att += (batch_idx * seq_len + token_idx) * leading_dim + thread_offset;
+    att += (batch_idx * max_seq_len + token_idx) * buf_len + thread_offset;
 
     float thread_data[ITEMS_PER_THREAD];
 #pragma unroll

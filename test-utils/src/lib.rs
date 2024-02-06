@@ -80,7 +80,7 @@ fn write_matrix<T: fmt::LowerExp>(
     for r in 0..rows {
         let row = &slice!(buf; cols; [r]);
         for it in row {
-            write!(to, "{it:.3e} ")?;
+            write!(to, "{it:<8.3e} ")?;
         }
         writeln!(to)?;
     }
