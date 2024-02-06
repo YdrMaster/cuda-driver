@@ -1,5 +1,5 @@
 [package]
-name = "transformer"
+name = "transformer-cuda"
 version = "0.0.0"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
@@ -11,6 +11,7 @@ cuda = { path = "../cuda" }
 
 [dev-dependencies]
 rand = "0.8"
+transformer = { path = "../transformer" }
 test-utils = { path = "../test-utils" }
 
 [build-dependencies]
