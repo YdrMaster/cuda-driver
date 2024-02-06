@@ -38,15 +38,12 @@ impl ContextGuard<'_> {
         if !log.is_empty() {
             println!("{log}");
         }
-        // 再上锁检查一遍
         let module = Arc::new(module.unwrap());
         let mut map = modules.lock().unwrap();
-        if !check_hold(&map, &symbols) {
-            for k in symbols {
-                // 确认指定的符号都存在
-                module.get_function(k);
-                map.insert(k.to_string(), module.clone());
-            }
+        for k in symbols {
+            // 确认指定的符号都存在
+            module.get_function(k);
+            map.insert(k.to_string(), module.clone());
         }
     }
 }
@@ -65,15 +62,7 @@ impl KernelFn {
 }
 
 fn check_hold(map: &HashMap<String, Arc<Module>>, symbols: &[&str]) -> bool {
-    let len = symbols.len();
-    let had = symbols.iter().filter(|&&k| map.contains_key(k)).count();
-    if had == len {
-        true
-    } else if had == 0 {
-        false
-    } else {
-        panic!()
-    }
+    symbols.iter().all(|&k| map.contains_key(k))
 }
 
 struct Module {
