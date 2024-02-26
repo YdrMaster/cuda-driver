@@ -183,3 +183,89 @@ impl DevSlice<'_> {
         driver!(cuMemcpyDtoH_v2(dst.as_mut_ptr().cast(), self.ptr, size));
     }
 }
+
+#[test]
+fn bench() {
+    use std::time::Instant;
+
+    crate::init();
+    let Some(dev) = crate::Device::fetch() else {
+        return;
+    };
+
+    // let d = 2048;
+    // let nh = 32;
+    // let nkvh = 4;
+    // let dh = d / nh;
+    // let di = 5632;
+    // let nv = 32000;
+    // let dt = 2;
+
+    let d = 4096;
+    let nh = 32;
+    let nkvh = 32;
+    let dh = d / nh;
+    let di = 12288;
+    let nv = 119696;
+    let dt = 2;
+
+    println!("model: {}", dt * d * (nv + nv + 1));
+    println!("layer: {}", (((nh + nkvh) * dh + 1) * 2 + di * 3) * d);
+    println!();
+
+    let m0 = vec![1u8; dt * nv * d];
+    let m1 = vec![1u8; dt * d];
+    let m2 = vec![1u8; dt * nv * d];
+    let m3 = vec![1u8; (((nh + nkvh) * dh + 1) * 2 + di * 3) * d];
+
+    dev.set_mempool_threshold(u64::MAX);
+    dev.context().apply(|ctx| {
+        {
+            let t0 = Instant::now();
+            ctx.lock_page(&m0);
+            ctx.lock_page(&m1);
+            ctx.lock_page(&m2);
+            ctx.lock_page(&m3);
+            let t1 = Instant::now();
+            println!("register = {:?}", t1 - t0);
+        }
+
+        let stream = ctx.stream();
+        for i in 0..4 {
+            let e0 = stream.record();
+            let t0 = Instant::now();
+            let _dev0 = stream.from_slice(&m0);
+            let _dev1 = stream.from_slice(&m1);
+            let _dev2 = stream.from_slice(&m2);
+            let t1 = Instant::now();
+            let e1 = stream.record();
+            e1.synchronize();
+            let t2 = Instant::now();
+            println!();
+            println!("model loop {i} total = {:?}", t2 - t0);
+            println!(
+                "host = {:?}, sync = {:?}, dev = {:?}",
+                t1 - t0,
+                t2 - t1,
+                e1.elapse_from(&e0),
+            );
+        }
+        for i in 0..4 {
+            let e0 = stream.record();
+            let t0 = Instant::now();
+            let _dev3 = stream.from_slice(&m3);
+            let t1 = Instant::now();
+            let e1 = stream.record();
+            e1.synchronize();
+            let t2 = Instant::now();
+            println!();
+            println!("layer loop {i} total = {:?}", t2 - t0);
+            println!(
+                "host = {:?}, sync = {:?}, dev = {:?}",
+                t1 - t0,
+                t2 - t1,
+                e1.elapse_from(&e0),
+            );
+        }
+    });
+}

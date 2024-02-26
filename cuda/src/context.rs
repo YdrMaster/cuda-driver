@@ -81,6 +81,21 @@ impl ContextGuard<'_> {
         self.0.clone()
     }
 
+    /// 将一段 host 存储空间注册为锁页内存，以允许从这个上下文直接访问。
+    pub fn lock_page<T>(&self, slice: &[T]) {
+        let ptrs = slice.as_ptr_range();
+        driver!(cuMemHostRegister_v2(
+            ptrs.start as _,
+            ptrs.end as usize - ptrs.start as usize,
+            0,
+        ));
+    }
+
+    /// 将一段 host 存储空间从锁页内存注销。
+    pub fn unlock_page<T>(&self, slice: &[T]) {
+        driver!(cuMemHostUnregister(slice.as_ptr() as _));
+    }
+
     #[inline]
     pub fn synchronize(&self) {
         driver!(cuCtxSynchronize());

@@ -1,5 +1,5 @@
-﻿use crate::bindings as cuda;
-use crate::AsRaw;
+﻿use crate::{bindings as cuda, AsRaw};
+use std::ptr::null_mut;
 
 #[repr(transparent)]
 pub struct Device(cuda::CUdevice);
@@ -49,6 +49,16 @@ impl Device {
         let mut bytes = 0;
         driver!(cuDeviceTotalMem_v2(&mut bytes, self.0));
         bytes as _
+    }
+
+    pub fn set_mempool_threshold(&self, threshold: u64) {
+        let mut mempool = null_mut();
+        driver!(cuDeviceGetDefaultMemPool(&mut mempool, self.0));
+        driver!(cuMemPoolSetAttribute(
+            mempool,
+            CUmemPool_attribute::CU_MEMPOOL_ATTR_RELEASE_THRESHOLD,
+            (&threshold) as *const _ as _,
+        ));
     }
 }
 
