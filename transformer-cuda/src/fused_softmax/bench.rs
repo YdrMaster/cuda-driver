@@ -89,6 +89,7 @@ fn once() {
                 Some(&stream),
             );
         }
+        stream.synchronize();
     });
 }
 
