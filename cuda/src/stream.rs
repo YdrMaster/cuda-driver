@@ -1,5 +1,5 @@
-﻿use crate::{bindings as cuda, AsRaw, Context, ContextGuard};
-use std::{ptr::null_mut, sync::Arc};
+﻿use crate::{bindings as cuda, AsRaw, ContextGuard};
+use std::ptr::null_mut;
 
 pub struct Stream<'a>(cuda::CUstream, &'a ContextGuard<'a>);
 
@@ -35,7 +35,7 @@ impl Stream<'_> {
     }
 
     #[inline]
-    pub fn clone_ctx(&self) -> Arc<Context> {
-        self.1.clone_ctx()
+    pub fn ctx(&self) -> &ContextGuard {
+        self.1
     }
 }

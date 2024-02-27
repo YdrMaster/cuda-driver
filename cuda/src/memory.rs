@@ -57,7 +57,7 @@ impl Stream<'_> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, size, self.as_raw()));
         DevBlob {
-            ctx: self.clone_ctx(),
+            ctx: self.ctx().clone_ctx(),
             ptr,
         }
     }

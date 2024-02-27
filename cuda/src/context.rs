@@ -77,6 +77,13 @@ impl AsRaw for ContextGuard<'_> {
 
 impl ContextGuard<'_> {
     #[inline]
+    pub fn dev(&self) -> Device {
+        let mut dev = 0;
+        driver!(cuCtxGetDevice(&mut dev));
+        Device::new(dev)
+    }
+
+    #[inline]
     pub fn clone_ctx(&self) -> Arc<Context> {
         self.0.clone()
     }
