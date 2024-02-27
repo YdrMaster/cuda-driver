@@ -22,6 +22,11 @@ impl Stream<'_> {
         Event(event)
     }
 
+    #[inline]
+    pub fn wait_for(&self, event: &Event) {
+        driver!(cuStreamWaitEvent(self.as_raw(), event.0, 0));
+    }
+
     pub fn bench(&self, f: impl Fn(usize, &Self), times: usize, warm_up: usize) -> Duration {
         for i in 0..warm_up {
             f(i, self);
