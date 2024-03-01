@@ -1,5 +1,5 @@
 ﻿use crate::{bindings as cu, CublasLtMatMulDescriptor, CublasLtMatrix};
-use cuda::{bindings::CUdeviceptr, AsRaw, Context, ContextGuard, DevSlice, Stream};
+use cuda::{bindings::CUdeviceptr, AsRaw, Context, ContextGuard, LocalDevBlob, Stream};
 use half::{bf16, f16};
 use std::{
     ffi::c_void,
@@ -135,7 +135,7 @@ impl CublasLtHandle {
         d: &CublasLtMatrix,
         d_ptr: &impl AsRaw<Raw = CUdeviceptr>,
         algo: cu::cublasLtMatmulAlgo_t,
-        workspace: &DevSlice,
+        workspace: &LocalDevBlob,
         stream: &Stream,
     ) {
         let mut buf = MaybeUninit::<cu::cudaDataType>::uninit();

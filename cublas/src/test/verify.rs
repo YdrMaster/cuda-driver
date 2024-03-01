@@ -13,8 +13,7 @@ fn general() {
         let stream = ctx.stream();
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(K * N, &stream);
-        let dev_c = stream.malloc_for::<f32>(M * N);
-        let dev_c = dev_c.as_slice(ctx);
+        let dev_c = stream.malloc::<f32>(M * N);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -70,8 +69,7 @@ fn general() {
         let handle = CublasLtHandle::create_on(ctx);
         let (algo, workspace_size) =
             handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
-        let workspace = stream.malloc(workspace_size);
-        let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
+        let workspace = stream.malloc::<u8>(workspace_size);
         matmul!(with handle, on stream;
                 do matmul, use algo, use workspace;
                (1.; a_desc, dev_a; b_desc, dev_b)
@@ -97,8 +95,7 @@ fn batching() {
         let stream = ctx.stream();
         let dev_a = rand_blob(BATCH * M * K, &stream);
         let dev_b = rand_blob(BATCH * K * N, &stream);
-        let dev_c = stream.malloc_for::<f32>(BATCH * M * N);
-        let dev_c = dev_c.as_slice(ctx);
+        let dev_c = stream.malloc::<f32>(BATCH * M * N);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -164,8 +161,7 @@ fn batching() {
         let handle = CublasLtHandle::create_on(ctx);
         let (algo, workspace_size) =
             handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
-        let workspace = stream.malloc(workspace_size);
-        let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
+        let workspace = stream.malloc::<u8>(workspace_size);
         matmul!(with handle, on stream;
                 do matmul, use algo, use workspace;
                (1.; a_desc, dev_a; b_desc, dev_b)
@@ -194,8 +190,7 @@ fn broadcast() {
         let stream = ctx.stream();
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(BATCH * K * N, &stream);
-        let dev_c = stream.malloc_for::<f32>(BATCH * M * N);
-        let dev_c = dev_c.as_slice(ctx);
+        let dev_c = stream.malloc::<f32>(BATCH * M * N);
 
         let mut cublas_handle = null_mut();
         cublas!(cublasCreate_v2(&mut cublas_handle));
@@ -259,8 +254,7 @@ fn broadcast() {
         let handle = CublasLtHandle::create_on(ctx);
         let (algo, workspace_size) =
             handle.tune(&matmul, &a_desc, &b_desc, &c_desc, &c_desc, usize::MAX);
-        let workspace = stream.malloc(workspace_size);
-        let workspace = unsafe { workspace.as_slice_unchecked(workspace_size) };
+        let workspace = stream.malloc::<u8>(workspace_size);
         matmul!(with handle, on stream;
                 do matmul, use algo, use workspace;
                (1.; a_desc, dev_a; b_desc, dev_b)

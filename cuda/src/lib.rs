@@ -54,7 +54,7 @@ pub use context::{Context, ContextGuard};
 pub use device::Device;
 pub use event::Event;
 pub use launch::KernelFn;
-pub use memory::{DevBlob, DevSlice};
+pub use memory::LocalDevBlob;
 pub use stream::Stream;
 
 #[allow(non_camel_case_types)]
