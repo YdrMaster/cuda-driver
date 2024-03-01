@@ -2,7 +2,6 @@
 use crate::{CublasLtHandle, CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
 use cuda::{AsRaw, Device};
 use std::ptr::null_mut;
-use test_utils::diff;
 
 #[test]
 fn general() {
@@ -273,4 +272,18 @@ fn broadcast() {
         let (abs_diff, _) = diff(&result, &answer);
         assert_eq!(abs_diff, 0.);
     });
+}
+
+pub fn diff(result: &[f32], ans: &[f32]) -> (f32, f32) {
+    assert_eq!(result.len(), ans.len());
+    let mut max_abs_diff = 0.0f32;
+    let mut up = 0.;
+    let mut down = 0.;
+    for (r, a) in result.iter().zip(ans) {
+        let diff = (r - a).abs();
+        max_abs_diff = max_abs_diff.max(diff);
+        up += diff;
+        down += a.abs();
+    }
+    (max_abs_diff, up / down)
 }

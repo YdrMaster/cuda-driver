@@ -12,7 +12,6 @@ cuda = { path = "../cuda" }
 
 [dev-dependencies]
 rand = "0.8"
-test-utils = { path = "../test-utils" }
 
 [build-dependencies]
 bindgen = "0.69"

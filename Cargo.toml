@@ -1,3 +1,3 @@
 [workspace]
-members = ["cuda", "cublas", "transformer", "transformer-cuda", "test-utils"]
+members = ["cuda", "cublas"]
 resolver = "2"
