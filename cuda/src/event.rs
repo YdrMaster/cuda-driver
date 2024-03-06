@@ -7,7 +7,7 @@ use std::{ptr::null_mut, time::Duration};
 pub struct Event<'ctx>(cuda::CUevent, ResourceOwnership<'ctx>);
 
 impl<'ctx> Stream<'ctx> {
-    pub fn record(&'ctx self) -> Event<'ctx> {
+    pub fn record(&self) -> Event<'ctx> {
         let mut event = null_mut();
         driver!(cuEventCreate(
             &mut event,

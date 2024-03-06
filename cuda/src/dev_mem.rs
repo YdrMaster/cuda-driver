@@ -14,7 +14,7 @@ pub struct DevMem<'ctx> {
 }
 
 impl<'ctx> Stream<'ctx> {
-    pub fn malloc<T: Copy>(&'ctx self, len: usize) -> DevMem<'ctx> {
+    pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, self.as_raw()));
@@ -25,7 +25,7 @@ impl<'ctx> Stream<'ctx> {
         }
     }
 
-    pub fn from_host<T: Copy>(&'ctx self, slice: &[T]) -> DevMem<'ctx> {
+    pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'ctx> {
         let stream = unsafe { self.as_raw() };
         let len = size_of_val(slice);
         let src = slice.as_ptr().cast();

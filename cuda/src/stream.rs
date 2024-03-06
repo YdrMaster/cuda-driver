@@ -33,15 +33,17 @@ impl AsRaw for Stream<'_> {
     }
 }
 
+impl<'ctx> Stream<'ctx> {
+    #[inline]
+    pub const fn ctx(&self) -> &'ctx ContextGuard<'ctx> {
+        self.1.ctx()
+    }
+}
+
 impl Stream<'_> {
     #[inline]
     pub fn synchronize(&self) {
         driver!(cuStreamSynchronize(self.0));
-    }
-
-    #[inline]
-    pub fn ctx(&self) -> &ContextGuard {
-        self.1.ctx()
     }
 }
 
