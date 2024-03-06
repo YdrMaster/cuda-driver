@@ -1,3 +1,4 @@
+#![deny(warnings)]
 #![cfg(detected_cuda)]
 
 #[macro_use]
@@ -29,11 +30,11 @@ pub mod bindings {
 }
 
 mod context;
+mod dev_mem;
 mod device;
 mod event;
-mod launch;
-mod memory;
-pub mod nvrtc;
+mod host_mem;
+mod nvrtc;
 mod stream;
 
 pub trait AsRaw {
@@ -50,12 +51,16 @@ pub fn init() {
     driver!(cuInit(0));
 }
 
-pub use context::{Context, ContextGuard};
+pub use context::{
+    ctx_eq, not_owned, owned, Context, ContextGuard, ContextResource, ContextSpore,
+    ResourceOwnership,
+};
+pub use dev_mem::{DevMem, DevMemSpore};
 pub use device::Device;
-pub use event::Event;
-pub use launch::KernelFn;
-pub use memory::LocalDevBlob;
-pub use stream::Stream;
+pub use event::{Event, EventSpore};
+pub use host_mem::{HostMem, HostMemSpore};
+pub use nvrtc::{Dim3, KernelFn, Module, ModuleSpore, Ptx, Symbol};
+pub use stream::{Stream, StreamSpore};
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -86,42 +91,5 @@ impl CudaDataType {
             Self::float => "float",
             Self::double => "double",
         }
-    }
-}
-
-use std::ffi::c_uint;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Dim3 {
-    pub x: c_uint,
-    pub y: c_uint,
-    pub z: c_uint,
-}
-
-impl From<()> for Dim3 {
-    #[inline]
-    fn from(_: ()) -> Self {
-        Self { x: 1, y: 1, z: 1 }
-    }
-}
-
-impl From<c_uint> for Dim3 {
-    #[inline]
-    fn from(x: c_uint) -> Self {
-        Self { x, y: 1, z: 1 }
-    }
-}
-
-impl From<(c_uint, c_uint)> for Dim3 {
-    #[inline]
-    fn from((y, x): (c_uint, c_uint)) -> Self {
-        Self { x, y, z: 1 }
-    }
-}
-
-impl From<(c_uint, c_uint, c_uint)> for Dim3 {
-    #[inline]
-    fn from((z, y, x): (c_uint, c_uint, c_uint)) -> Self {
-        Self { x, y, z }
     }
 }

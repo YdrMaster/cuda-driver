@@ -1,18 +1,14 @@
 [package]
 name = "cublas"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-half = "2.4"
 cuda = { path = "../cuda" }
 
-[dev-dependencies]
-rand = "0.8"
-
 [build-dependencies]
-bindgen = "0.69"
-find_cuda_helper = "0.2"
+bindgen.workspace = true
+find_cuda_helper.workspace = true

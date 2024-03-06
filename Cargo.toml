@@ -1,3 +1,7 @@
 [workspace]
 members = ["cuda", "cublas"]
 resolver = "2"
+
+[workspace.dependencies]
+bindgen = "0.69"
+find_cuda_helper = "0.2"

@@ -1,27 +1,41 @@
-﻿use crate::{bindings as cuda, AsRaw, Stream};
+﻿use crate::{
+    bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
+    ContextGuard, ContextResource, ContextSpore, Stream,
+};
 use std::{ptr::null_mut, time::Duration};
 
-#[repr(transparent)]
-pub struct Event(cuda::CUevent);
+pub struct Event<'ctx>(cuda::CUevent, ResourceOwnership<'ctx>);
 
-impl Drop for Event {
-    #[inline]
-    fn drop(&mut self) {
-        driver!(cuEventDestroy_v2(self.0));
-    }
-}
-
-impl Stream<'_> {
-    pub fn record(&self) -> Event {
+impl<'ctx> Stream<'ctx> {
+    pub fn record(&'ctx self) -> Event<'ctx> {
         let mut event = null_mut();
         driver!(cuEventCreate(
             &mut event,
             CUstream_flags::CU_STREAM_DEFAULT as _
         ));
         driver!(cuEventRecord(event, self.as_raw()));
-        Event(event)
+        Event(event, owned(self.ctx()))
     }
+}
 
+impl Drop for Event<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        if self.1.is_owned() {
+            driver!(cuEventDestroy_v2(self.0));
+        }
+    }
+}
+
+impl AsRaw for Event<'_> {
+    type Raw = cuda::CUevent;
+    #[inline]
+    unsafe fn as_raw(&self) -> Self::Raw {
+        self.0
+    }
+}
+
+impl Stream<'_> {
     #[inline]
     pub fn wait_for(&self, event: &Event) {
         driver!(cuStreamWaitEvent(self.as_raw(), event.0, 0));
@@ -41,7 +55,7 @@ impl Stream<'_> {
     }
 }
 
-impl Event {
+impl Event<'_> {
     #[inline]
     pub fn synchronize(&self) {
         driver!(cuEventSynchronize(self.0));
@@ -52,5 +66,38 @@ impl Event {
         let mut ms = 0.0;
         driver!(cuEventElapsedTime(&mut ms, start.0, self.0));
         Duration::from_secs_f32(ms / 1000.0)
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct EventSpore(cuda::CUevent);
+
+spore_convention!(EventSpore);
+
+impl ContextSpore for EventSpore {
+    type Resource<'ctx> = Event<'ctx>;
+
+    #[inline]
+    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+        Event(self.0, not_owned(ctx))
+    }
+
+    #[inline]
+    unsafe fn kill(&mut self, ctx: &ContextGuard) {
+        drop(Event(self.0, owned(ctx)));
+    }
+
+    #[inline]
+    fn is_alive(&self) -> bool {
+        !self.0.is_null()
+    }
+}
+
+impl<'ctx> ContextResource<'ctx> for Event<'ctx> {
+    type Spore = EventSpore;
+
+    #[inline]
+    fn sporulate(self) -> Self::Spore {
+        EventSpore(self.0)
     }
 }
