@@ -55,7 +55,7 @@ pub use context::{
     ctx_eq, not_owned, owned, Context, ContextGuard, ContextResource, ContextSpore,
     ResourceOwnership,
 };
-pub use dev_mem::{DevMem, DevMemSpore};
+pub use dev_mem::{DevMem, DevMemSpore, DevSlice};
 pub use device::Device;
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
