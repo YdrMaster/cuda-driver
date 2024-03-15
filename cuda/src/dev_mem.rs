@@ -4,6 +4,7 @@
 };
 use std::{
     alloc::Layout,
+    cell::UnsafeCell,
     mem::{forget, size_of_val, take},
     ops::{Deref, DerefMut},
 };
@@ -60,7 +61,7 @@ impl DevSlice {
 }
 
 pub struct DevMem<'ctx> {
-    slice: DevSlice,
+    slice: UnsafeCell<DevSlice>,
     ownership: ResourceOwnership<'ctx>,
 }
 
@@ -70,7 +71,7 @@ impl<'ctx> Stream<'ctx> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, self.as_raw()));
         DevMem {
-            slice: DevSlice { ptr, len },
+            slice: UnsafeCell::new(DevSlice { ptr, len }),
             ownership: owned(self.ctx()),
         }
     }
@@ -83,7 +84,7 @@ impl<'ctx> Stream<'ctx> {
         driver!(cuMemAllocAsync(&mut ptr, len, stream));
         driver!(cuMemcpyHtoDAsync_v2(ptr, src, len, stream));
         DevMem {
-            slice: DevSlice { ptr, len },
+            slice: UnsafeCell::new(DevSlice { ptr, len }),
             ownership: owned(self.ctx()),
         }
     }
@@ -93,7 +94,7 @@ impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
         if self.ownership.is_owned() {
-            driver!(cuMemFree_v2(self.slice.ptr));
+            driver!(cuMemFree_v2(self.slice.get_mut().ptr));
         }
     }
 }
@@ -102,14 +103,21 @@ impl Deref for DevMem<'_> {
     type Target = DevSlice;
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.slice
+        unsafe { &*self.slice.get() }
     }
 }
 
 impl DerefMut for DevMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.slice
+        self.slice.get_mut()
+    }
+}
+
+impl DevMem<'_> {
+    #[inline]
+    pub unsafe fn get_mut(&self) -> &mut DevSlice {
+        unsafe { &mut *self.slice.get() }
     }
 }
 
@@ -125,10 +133,10 @@ impl ContextSpore for DevMemSpore {
     #[inline]
     unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         DevMem {
-            slice: DevSlice {
+            slice: UnsafeCell::new(DevSlice {
                 ptr: self.0.ptr,
                 len: self.0.len,
-            },
+            }),
             ownership: not_owned(ctx),
         }
     }
@@ -136,10 +144,10 @@ impl ContextSpore for DevMemSpore {
     #[inline]
     unsafe fn kill(&mut self, ctx: &ContextGuard) {
         drop(DevMem {
-            slice: DevSlice {
+            slice: UnsafeCell::new(DevSlice {
                 ptr: take(&mut self.0.ptr),
                 len: self.0.len,
-            },
+            }),
             ownership: owned(ctx),
         });
     }
