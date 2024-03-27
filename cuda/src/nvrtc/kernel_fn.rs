@@ -2,7 +2,7 @@
 use std::ffi::{c_uint, CStr};
 use std::{ffi::c_void, ptr::null_mut};
 
-pub struct KernelFn<'m>(cuda::CUfunction, &'m Module<'m>);
+pub struct KernelFn<'m>(cuda::CUfunction, #[allow(unused)] &'m Module<'m>);
 
 impl<'m> Module<'m> {
     pub fn get_kernel(&'m self, name: impl AsRef<CStr>) -> KernelFn<'m> {

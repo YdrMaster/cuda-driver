@@ -5,7 +5,10 @@ use cuda::{
 };
 use std::{mem::replace, ptr::null_mut};
 
-pub struct CublasLt<'ctx>(cublas::cublasLtHandle_t, ResourceOwnership<'ctx>);
+pub struct CublasLt<'ctx>(
+    cublas::cublasLtHandle_t,
+    #[allow(unused)] ResourceOwnership<'ctx>,
+);
 
 impl Drop for CublasLt<'_> {
     #[inline]
