@@ -131,7 +131,7 @@ impl ContextSpore for DevMemSpore {
     type Resource<'ctx> = DevMem<'ctx>;
 
     #[inline]
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         DevMem {
             slice: UnsafeCell::new(DevSlice {
                 ptr: self.0.ptr,

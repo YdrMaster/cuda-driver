@@ -122,7 +122,7 @@ pub trait ContextSpore: 'static + Send + Sync {
     /// # Safety
     ///
     /// This function must be called in the same context as the one that created the resource.
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx>;
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx>;
     /// # Safety
     ///
     /// This function must be called in the same context as the one that created the resource.
@@ -133,13 +133,13 @@ pub trait ContextSpore: 'static + Send + Sync {
 pub struct ResourceOwnership<'ctx>(bool, &'ctx ContextGuard<'ctx>);
 
 #[inline(always)]
-pub const fn owned<'ctx>(ctx: &'ctx ContextGuard<'ctx>) -> ResourceOwnership<'ctx> {
+pub const fn owned<'ctx>(ctx: &'ctx ContextGuard) -> ResourceOwnership<'ctx> {
     ResourceOwnership(true, ctx)
 }
 
 #[inline(always)]
-pub const fn not_owned<'ctx>(ctx: &'ctx ContextGuard<'ctx>) -> ResourceOwnership<'ctx> {
-    ResourceOwnership(true, ctx)
+pub const fn not_owned<'ctx>(ctx: &'ctx ContextGuard) -> ResourceOwnership<'ctx> {
+    ResourceOwnership(false, ctx)
 }
 
 impl<'ctx> ResourceOwnership<'ctx> {

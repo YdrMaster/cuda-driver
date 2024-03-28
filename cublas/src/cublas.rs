@@ -3,14 +3,19 @@ use cuda::{
     ctx_eq, not_owned, owned, spore_convention, AsRaw, ContextGuard, ContextResource, ContextSpore,
     ResourceOwnership,
 };
-use std::{mem::replace, ptr::null_mut};
+use std::{
+    mem::{forget, replace},
+    ptr::null_mut,
+};
 
 pub struct Cublas<'ctx>(cublas::cublasHandle_t, ResourceOwnership<'ctx>);
 
 impl Drop for Cublas<'_> {
     #[inline]
     fn drop(&mut self) {
-        cublas!(cublas::cublasDestroy_v2(self.0));
+        if self.1.is_owned() {
+            cublas!(cublas::cublasDestroy_v2(self.0));
+        }
     }
 }
 
@@ -47,7 +52,7 @@ impl ContextSpore for CublasSpore {
     type Resource<'ctx> = Cublas<'ctx>;
 
     #[inline]
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         Cublas(self.0, not_owned(ctx))
     }
 
@@ -67,6 +72,8 @@ impl<'ctx> ContextResource<'ctx> for Cublas<'ctx> {
 
     #[inline]
     fn sporulate(self) -> Self::Spore {
-        CublasSpore(self.0)
+        let handle = self.0;
+        forget(self);
+        CublasSpore(handle)
     }
 }

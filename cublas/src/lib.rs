@@ -21,5 +21,5 @@ pub mod bindings {
 mod cublas;
 mod cublaslt;
 
-pub use cublas::Cublas;
-pub use cublaslt::CublasLt;
+pub use cublas::{Cublas, CublasSpore};
+pub use cublaslt::{CublasLt, CublasLtSpore};

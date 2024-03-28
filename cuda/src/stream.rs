@@ -2,7 +2,10 @@
     bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
     ContextGuard, ContextResource, ContextSpore,
 };
-use std::{mem::replace, ptr::null_mut};
+use std::{
+    mem::{forget, replace},
+    ptr::null_mut,
+};
 
 pub struct Stream<'ctx>(cuda::CUstream, ResourceOwnership<'ctx>);
 
@@ -57,7 +60,7 @@ impl ContextSpore for StreamSpore {
     type Resource<'ctx> = Stream<'ctx>;
 
     #[inline]
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         Stream(self.0, not_owned(ctx))
     }
 
@@ -77,6 +80,8 @@ impl<'ctx> ContextResource<'ctx> for Stream<'ctx> {
 
     #[inline]
     fn sporulate(self) -> Self::Spore {
-        StreamSpore(self.0)
+        let s = self.0;
+        forget(self);
+        StreamSpore(s)
     }
 }

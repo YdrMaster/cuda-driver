@@ -2,7 +2,7 @@
     bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
     ContextGuard, ContextResource, ContextSpore, Stream,
 };
-use std::{ptr::null_mut, time::Duration};
+use std::{mem::forget, ptr::null_mut, time::Duration};
 
 pub struct Event<'ctx>(cuda::CUevent, ResourceOwnership<'ctx>);
 
@@ -78,7 +78,7 @@ impl ContextSpore for EventSpore {
     type Resource<'ctx> = Event<'ctx>;
 
     #[inline]
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         Event(self.0, not_owned(ctx))
     }
 
@@ -98,6 +98,8 @@ impl<'ctx> ContextResource<'ctx> for Event<'ctx> {
 
     #[inline]
     fn sporulate(self) -> Self::Spore {
-        EventSpore(self.0)
+        let e = self.0;
+        forget(self);
+        EventSpore(e)
     }
 }

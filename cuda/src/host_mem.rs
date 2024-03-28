@@ -4,7 +4,7 @@
 };
 use std::{
     alloc::Layout,
-    mem::replace,
+    mem::{forget, replace},
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::null_mut,
@@ -71,7 +71,7 @@ impl ContextSpore for HostMemSpore {
     type Resource<'ctx> = HostMem<'ctx>;
 
     #[inline]
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         HostMem {
             ptr: self.0,
             len: self.1,
@@ -99,6 +99,39 @@ impl<'ctx> ContextResource<'ctx> for HostMem<'ctx> {
 
     #[inline]
     fn sporulate(self) -> Self::Spore {
-        HostMemSpore(self.ptr, self.len)
+        let ans = HostMemSpore(self.ptr, self.len);
+        forget(self);
+        ans
     }
+}
+
+impl Deref for HostMemSpore {
+    type Target = [u8];
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::slice::from_raw_parts(self.0.cast(), self.1) }
+    }
+}
+
+impl DerefMut for HostMemSpore {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { std::slice::from_raw_parts_mut(self.0.cast(), self.1) }
+    }
+}
+
+#[test]
+fn test_behavior() {
+    crate::init();
+    let Some(dev) = crate::Device::fetch() else {
+        return;
+    };
+    let mut ptr = null_mut();
+    dev.context().apply(|_| {
+        driver!(cuMemHostAlloc(&mut ptr, 128, 0));
+        driver!(cuMemFreeHost(ptr));
+    });
+    ptr = null_mut();
+    driver!(cuMemFreeHost(ptr));
 }

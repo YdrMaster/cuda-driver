@@ -43,7 +43,7 @@ impl ContextSpore for ModuleSpore {
     type Resource<'ctx> = Module<'ctx>;
 
     #[inline]
-    unsafe fn sprout<'ctx>(&'ctx self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
+    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         Module(self.0, not_owned(ctx))
     }
 
