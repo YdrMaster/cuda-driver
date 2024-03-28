@@ -3,7 +3,10 @@ use crate::{
     bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
     ContextGuard, ContextResource, ContextSpore,
 };
-use std::{mem::replace, ptr::null_mut};
+use std::{
+    mem::{forget, replace},
+    ptr::null_mut,
+};
 
 pub struct Module<'ctx>(cuda::CUmodule, ResourceOwnership<'ctx>);
 
@@ -63,6 +66,8 @@ impl<'ctx> ContextResource<'ctx> for Module<'ctx> {
 
     #[inline]
     fn sporulate(self) -> Self::Spore {
-        ModuleSpore(self.0)
+        let m = self.0;
+        forget(self);
+        ModuleSpore(m)
     }
 }
