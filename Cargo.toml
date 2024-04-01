@@ -1,5 +1,5 @@
 [workspace]
-members = ["cuda", "cublas"]
+members = ["cuda", "cublas", "nccl"]
 resolver = "2"
 
 [workspace.dependencies]

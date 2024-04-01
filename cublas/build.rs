@@ -6,14 +6,13 @@
     };
 
     println!("cargo:rustc-cfg=detected_cuda");
-    println!("cargo:rustc-env=CUDA_ROOT={}", cuda_root.display());
 
     // Tell cargo to tell rustc to link the cuda library.
     find_cuda_helper::include_cuda();
     println!("cargo:rustc-link-lib=dylib=cublas");
     println!("cargo:rustc-link-lib=dylib=cublasLt");
 
-    // Tell cargo to invalidate the built crate whenever the wrapper changes
+    // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper.h");
 
     // The bindgen::Builder is the main entry point to bindgen,

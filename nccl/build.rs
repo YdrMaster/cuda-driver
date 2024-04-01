@@ -1,16 +1,21 @@
 ﻿fn main() {
-    use std::{env, path::PathBuf};
+    use std::{env, path::PathBuf, process::Command};
 
     let Some(cuda_root) = find_cuda_helper::find_cuda_root() else {
         return;
     };
+    let Ok(output) = Command::new("ldconfig").arg("-p").output() else {
+        return;
+    };
+    if !unsafe { String::from_utf8_unchecked(output.stdout) }.contains("nccl") {
+        return;
+    }
 
-    println!("cargo:rustc-cfg=detected_cuda");
-    println!("cargo:rustc-env=CUDA_ROOT={}", cuda_root.display());
+    println!("cargo:rustc-cfg=detected_nccl");
 
     // Tell cargo to tell rustc to link the cuda library.
     find_cuda_helper::include_cuda();
-    println!("cargo:rustc-link-lib=dylib=nvrtc");
+    println!("cargo:rustc-link-lib=dylib=nccl");
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper.h");
@@ -22,12 +27,10 @@
         .header("wrapper.h")
         .clang_arg(format!("-I{}/include", cuda_root.display()))
         // Only generate bindings for the functions in these namespaces.
-        .allowlist_function("cu.*")
-        .allowlist_function("nvrtc.*")
-        .allowlist_item("CU.*")
+        // .allowlist_function("cublas.*")
+        // .allowlist_item("cublas.*")
         // Annotate the given type with the #[must_use] attribute.
-        .must_use_type("CUresult")
-        .must_use_type("nvrtcResult")
+        // .must_use_type("cublasStatus_t")
         // Generate rust style enums.
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,
