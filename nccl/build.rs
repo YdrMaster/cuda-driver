@@ -27,10 +27,10 @@
         .header("wrapper.h")
         .clang_arg(format!("-I{}/include", cuda_root.display()))
         // Only generate bindings for the functions in these namespaces.
-        // .allowlist_function("cublas.*")
-        // .allowlist_item("cublas.*")
+        .allowlist_function("nccl.*")
+        .allowlist_item("nccl.*")
         // Annotate the given type with the #[must_use] attribute.
-        // .must_use_type("cublasStatus_t")
+        .must_use_type("ncclResult_t")
         // Generate rust style enums.
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,
