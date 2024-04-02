@@ -19,10 +19,22 @@ pub mod bindings {
     }
 }
 
-#[test]
-fn test() {
-    use std::ptr::null_mut;
-    let mut comm = null_mut();
-    let devlist = [0];
-    nccl!(ncclCommInitAll(&mut comm, 1, devlist.as_ptr()))
+mod all_reduce;
+mod communicator;
+mod group;
+
+pub use bindings::ncclRedOp_t as ReduceType;
+pub use communicator::Communicator;
+pub use group::CommunicatorGroup;
+
+use bindings::ncclDataType_t;
+use cuda::CudaDataType;
+
+fn convert(data_type: cuda::CudaDataType) -> ncclDataType_t {
+    match data_type {
+        CudaDataType::half => ncclDataType_t::ncclHalf,
+        CudaDataType::float => ncclDataType_t::ncclFloat,
+        CudaDataType::double => ncclDataType_t::ncclDouble,
+        CudaDataType::nv_bfloat16 => panic!("nv_bfloat16 is not supported by NCCL"),
+    }
 }
