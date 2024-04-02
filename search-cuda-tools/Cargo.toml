@@ -1,5 +1,5 @@
 [package]
-name = "cublas"
+name = "search-cuda-tools"
 version = "0.1.0"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
@@ -7,8 +7,4 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cuda = { path = "../cuda" }
-
-[build-dependencies]
-bindgen.workspace = true
-search-cuda-tools = { path = "../search-cuda-tools" }
+find_cuda_helper.workspace = true

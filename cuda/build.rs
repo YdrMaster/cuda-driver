@@ -1,16 +1,14 @@
 ﻿fn main() {
     use std::{env, path::PathBuf};
 
-    let Some(cuda_root) = find_cuda_helper::find_cuda_root() else {
+    let Some(cuda_root) = search_cuda_tools::find_cuda_root() else {
         return;
     };
+    search_cuda_tools::detect_cuda();
+    search_cuda_tools::include_cuda();
 
-    println!("cargo:rustc-cfg=detected_cuda");
-    println!("cargo:rustc-env=CUDA_ROOT={}", cuda_root.display());
-
-    // Tell cargo to tell rustc to link the cuda library.
-    find_cuda_helper::include_cuda();
     println!("cargo:rustc-link-lib=dylib=nvrtc");
+    println!("cargo:rustc-env=CUDA_ROOT={}", cuda_root.display());
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper.h");
