@@ -2,7 +2,11 @@
     bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
     ContextGuard, ContextResource, ContextSpore, Stream,
 };
-use std::{mem::forget, ptr::null_mut, time::Duration};
+use std::{
+    mem::{forget, replace},
+    ptr::null_mut,
+    time::Duration,
+};
 
 pub struct Event<'ctx>(cuda::CUevent, ResourceOwnership<'ctx>);
 
@@ -84,7 +88,7 @@ impl ContextSpore for EventSpore {
 
     #[inline]
     unsafe fn kill(&mut self, ctx: &ContextGuard) {
-        drop(Event(self.0, owned(ctx)));
+        drop(Event(replace(&mut self.0, null_mut()), owned(ctx)));
     }
 
     #[inline]
