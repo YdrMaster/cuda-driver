@@ -6,7 +6,7 @@ use std::{
     alloc::Layout,
     cell::UnsafeCell,
     mem::{forget, size_of_val, take},
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, RangeBounds},
 };
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -65,6 +65,30 @@ pub struct DevMem<'ctx> {
     ownership: ResourceOwnership<'ctx>,
 }
 
+impl ContextGuard<'_> {
+    pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'_> {
+        let len = Layout::array::<T>(len).unwrap().size();
+        let mut ptr = 0;
+        driver!(cuMemAlloc_v2(&mut ptr, len));
+        DevMem {
+            slice: UnsafeCell::new(DevSlice { ptr, len }),
+            ownership: owned(self),
+        }
+    }
+
+    pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'_> {
+        let len = size_of_val(slice);
+        let src = slice.as_ptr().cast();
+        let mut ptr = 0;
+        driver!(cuMemAlloc_v2(&mut ptr, len));
+        driver!(cuMemcpyHtoD_v2(ptr, src, len));
+        DevMem {
+            slice: UnsafeCell::new(DevSlice { ptr, len }),
+            ownership: owned(self),
+        }
+    }
+}
+
 impl<'ctx> Stream<'ctx> {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
@@ -118,6 +142,27 @@ impl DevMem<'_> {
     #[inline]
     pub unsafe fn get_mut(&self) -> &mut DevSlice {
         unsafe { &mut *self.slice.get() }
+    }
+
+    pub fn slice(&self, range: impl RangeBounds<usize>) -> DevMem {
+        use std::ops::Bound::{Excluded, Included, Unbounded};
+        let start = match range.start_bound() {
+            Included(&i) => i,
+            Excluded(&i) => i + 1,
+            Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Included(&i) => i + 1,
+            Excluded(&i) => i,
+            Unbounded => self.len,
+        };
+        Self {
+            slice: UnsafeCell::new(DevSlice {
+                ptr: self.ptr + start as cuda::CUdeviceptr,
+                len: end.saturating_sub(start),
+            }),
+            ownership: not_owned(self.ownership.ctx()),
+        }
     }
 }
 
