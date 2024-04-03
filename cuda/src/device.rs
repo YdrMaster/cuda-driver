@@ -52,6 +52,11 @@ impl Device {
     }
 
     #[inline]
+    pub fn alignment(&self) -> usize {
+        self.get_attribute(cuda::CUdevice_attribute_enum::CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT)
+            as _
+    }
+
     pub fn max_block_dims(&self) -> (usize, Dim3) {
         use cuda::CUdevice_attribute::*;
         (
