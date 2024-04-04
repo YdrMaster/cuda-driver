@@ -1,9 +1,9 @@
 ﻿use crate::Communicator;
-use cuda::{ContextGuard, Device};
-use std::{ffi::c_int, iter::zip, ptr::null_mut};
+use cuda::{Context, ContextGuard};
+use std::{ffi::c_int, ptr::null_mut};
 
 #[repr(transparent)]
-pub struct CommunicatorGroup(Vec<(c_int, Communicator)>);
+pub struct CommunicatorGroup(Vec<Communicator>);
 
 impl CommunicatorGroup {
     pub fn new(devlist: &[c_int]) -> Self {
@@ -13,18 +13,19 @@ impl CommunicatorGroup {
             devlist.len() as _,
             devlist.as_ptr()
         ));
-        Self(
-            zip(devlist, comms)
-                .map(|(&dev, comm)| (dev, Communicator(comm)))
-                .collect(),
-        )
+        Self(comms.into_iter().map(From::from).collect())
+    }
+
+    #[inline]
+    pub fn context_iter(&self) -> impl Iterator<Item = Context> + '_ {
+        self.0.iter().map(|comm| comm.device().retain_primary())
     }
 
     #[inline]
     pub fn apply(&self, mut f: impl FnMut(&Communicator, &ContextGuard)) {
         nccl!(ncclGroupStart());
-        for (dev, comm) in &self.0 {
-            Device::new(*dev).retain_primary().apply(|ctx| f(comm, ctx));
+        for comm in &self.0 {
+            comm.device().retain_primary().apply(|ctx| f(comm, ctx));
         }
         nccl!(ncclGroupEnd());
     }

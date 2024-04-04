@@ -1,5 +1,5 @@
 ﻿use crate::{bindings as cuda, AsRaw, Dim3};
-use std::ptr::null_mut;
+use std::{ffi::c_int, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct Device(cuda::CUdevice);
@@ -14,7 +14,7 @@ impl AsRaw for Device {
 
 impl Device {
     #[inline]
-    pub fn new(index: i32) -> Self {
+    pub fn new(index: c_int) -> Self {
         let mut device = 0;
         driver!(cuDeviceGet(&mut device, index));
         Self(device)
