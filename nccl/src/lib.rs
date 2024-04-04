@@ -3,8 +3,8 @@
 #![cfg(detected_nccl)]
 
 #[macro_use]
+#[allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
 pub mod bindings {
-    #![allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
     #[macro_export]

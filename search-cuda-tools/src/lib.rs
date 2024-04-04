@@ -6,12 +6,8 @@ pub fn find_nccl() -> Option<PathBuf> {
     if !cfg!(target_os = "linux") {
         return None;
     }
-    let Some(cuda_root) = find_cuda_helper::find_cuda_root() else {
-        return None;
-    };
-    let Ok(output) = Command::new("ldconfig").arg("-p").output() else {
-        return None;
-    };
+    let cuda_root = find_cuda_helper::find_cuda_root()?;
+    let output = Command::new("ldconfig").arg("-p").output().ok()?;
     if !unsafe { String::from_utf8_unchecked(output.stdout) }.contains("nccl") {
         return None;
     }

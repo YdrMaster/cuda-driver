@@ -139,6 +139,10 @@ impl DerefMut for DevMem<'_> {
 }
 
 impl DevMem<'_> {
+    /// # Safety
+    ///
+    /// Mutable borrow from immutable reference.
+    #[allow(clippy::mut_from_ref)]
     #[inline]
     pub unsafe fn get_mut(&self) -> &mut DevSlice {
         unsafe { &mut *self.slice.get() }

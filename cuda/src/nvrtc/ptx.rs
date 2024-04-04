@@ -1,4 +1,5 @@
 ﻿use crate::bindings as cuda;
+use core::fmt;
 use std::{
     ffi::{c_char, CString},
     path::{Path, PathBuf},
@@ -95,10 +96,10 @@ impl Ptx {
     }
 }
 
-impl ToString for Ptx {
+impl fmt::Display for Ptx {
     #[inline]
-    fn to_string(&self) -> String {
-        self.0.to_string_lossy().into_owned()
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0.to_string_lossy())
     }
 }
 
