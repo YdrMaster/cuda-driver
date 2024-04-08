@@ -4,64 +4,48 @@
 };
 use std::{
     alloc::Layout,
-    cell::UnsafeCell,
     mem::{forget, size_of_val, take},
-    ops::{Deref, DerefMut, RangeBounds},
+    ops::{Deref, DerefMut},
+    slice::{from_raw_parts, from_raw_parts_mut},
 };
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct DevSlice {
-    ptr: cuda::CUdeviceptr,
-    len: usize,
+#[repr(transparent)]
+pub struct DevByte(#[allow(unused)] u8);
+
+#[inline]
+pub fn memcpy_d2h<T: Copy>(dst: &mut [T], src: &[DevByte]) {
+    let len = size_of_val(dst);
+    let dst = dst.as_mut_ptr().cast();
+    assert_eq!(len, size_of_val(src));
+    driver!(cuMemcpyDtoH_v2(dst, src.as_ptr() as _, len));
 }
 
-impl AsRaw for DevSlice {
-    type Raw = cuda::CUdeviceptr;
-
-    #[inline]
-    unsafe fn as_raw(&self) -> Self::Raw {
-        self.ptr
-    }
+#[inline]
+pub fn memcpy_h2d<T: Copy>(dst: &mut [DevByte], src: &[T]) {
+    let len = size_of_val(src);
+    let src = src.as_ptr().cast();
+    assert_eq!(len, size_of_val(dst));
+    driver!(cuMemcpyHtoD_v2(dst.as_ptr() as _, src, len));
 }
 
-impl DevSlice {
+impl Stream<'_> {
     #[inline]
-    pub const fn len(&self) -> usize {
-        self.len
-    }
-
-    #[inline]
-    pub const fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
-    #[inline]
-    pub fn copy_out<T: Copy>(&self, slice: &mut [T]) {
-        let len = size_of_val(slice);
-        let dst = slice.as_mut_ptr().cast();
-        assert_eq!(len, self.len);
-        driver!(cuMemcpyDtoH_v2(dst, self.ptr, len));
-    }
-
-    #[inline]
-    pub fn copy_in_async<T: Copy>(&mut self, slice: &[T], stream: &Stream) {
-        let len = size_of_val(slice);
-        let src = slice.as_ptr().cast();
-        assert_eq!(len, self.len);
-        driver!(cuMemcpyHtoDAsync_v2(self.ptr, src, len, stream.as_raw()));
-    }
-
-    #[inline]
-    pub fn copy_in<T: Copy>(&mut self, slice: &[T]) {
-        let len = size_of_val(slice);
-        let src = slice.as_ptr().cast();
-        assert_eq!(len, self.len);
-        driver!(cuMemcpyHtoD_v2(self.ptr, src, len));
+    pub fn memcpy_h2d<T: Copy>(&self, dst: &mut [DevByte], src: &[T]) {
+        let len = size_of_val(src);
+        let src = src.as_ptr().cast();
+        assert_eq!(len, size_of_val(dst));
+        driver!(cuMemcpyHtoDAsync_v2(
+            dst.as_ptr() as _,
+            src,
+            len,
+            self.as_raw()
+        ));
     }
 }
 
 pub struct DevMem<'ctx> {
-    slice: UnsafeCell<DevSlice>,
+    ptr: cuda::CUdeviceptr,
+    len: usize,
     ownership: ResourceOwnership<'ctx>,
 }
 
@@ -71,7 +55,8 @@ impl ContextGuard<'_> {
         let mut ptr = 0;
         driver!(cuMemAlloc_v2(&mut ptr, len));
         DevMem {
-            slice: UnsafeCell::new(DevSlice { ptr, len }),
+            ptr,
+            len,
             ownership: owned(self),
         }
     }
@@ -83,7 +68,8 @@ impl ContextGuard<'_> {
         driver!(cuMemAlloc_v2(&mut ptr, len));
         driver!(cuMemcpyHtoD_v2(ptr, src, len));
         DevMem {
-            slice: UnsafeCell::new(DevSlice { ptr, len }),
+            ptr,
+            len,
             ownership: owned(self),
         }
     }
@@ -95,7 +81,8 @@ impl<'ctx> Stream<'ctx> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, self.as_raw()));
         DevMem {
-            slice: UnsafeCell::new(DevSlice { ptr, len }),
+            ptr,
+            len,
             ownership: owned(self.ctx()),
         }
     }
@@ -108,7 +95,8 @@ impl<'ctx> Stream<'ctx> {
         driver!(cuMemAllocAsync(&mut ptr, len, stream));
         driver!(cuMemcpyHtoDAsync_v2(ptr, src, len, stream));
         DevMem {
-            slice: UnsafeCell::new(DevSlice { ptr, len }),
+            ptr,
+            len,
             ownership: owned(self.ctx()),
         }
     }
@@ -118,23 +106,23 @@ impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
         if self.ownership.is_owned() {
-            driver!(cuMemFree_v2(self.slice.get_mut().ptr));
+            driver!(cuMemFree_v2(self.ptr));
         }
     }
 }
 
 impl Deref for DevMem<'_> {
-    type Target = DevSlice;
+    type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { &*self.slice.get() }
+        unsafe { from_raw_parts(self.ptr as _, self.len) }
     }
 }
 
 impl DerefMut for DevMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.slice.get_mut()
+        unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
     }
 }
 
@@ -144,35 +132,16 @@ impl DevMem<'_> {
     /// Mutable borrow from immutable reference.
     #[allow(clippy::mut_from_ref)]
     #[inline]
-    pub unsafe fn get_mut(&self) -> &mut DevSlice {
-        unsafe { &mut *self.slice.get() }
-    }
-
-    pub fn slice(&self, range: impl RangeBounds<usize>) -> DevMem {
-        use std::ops::Bound::{Excluded, Included, Unbounded};
-        let start = match range.start_bound() {
-            Included(&i) => i,
-            Excluded(&i) => i + 1,
-            Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Included(&i) => i + 1,
-            Excluded(&i) => i,
-            Unbounded => self.len,
-        };
-        Self {
-            slice: UnsafeCell::new(DevSlice {
-                ptr: self.ptr + start as cuda::CUdeviceptr,
-                len: end.saturating_sub(start),
-            }),
-            ownership: not_owned(self.ownership.ctx()),
-        }
+    pub unsafe fn get_mut(&self) -> &mut [DevByte] {
+        unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
     }
 }
 
 #[derive(PartialEq, Eq, Debug)]
-#[repr(transparent)]
-pub struct DevMemSpore(DevSlice);
+pub struct DevMemSpore {
+    ptr: cuda::CUdeviceptr,
+    len: usize,
+}
 
 spore_convention!(DevMemSpore);
 
@@ -182,10 +151,8 @@ impl ContextSpore for DevMemSpore {
     #[inline]
     unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
         DevMem {
-            slice: UnsafeCell::new(DevSlice {
-                ptr: self.0.ptr,
-                len: self.0.len,
-            }),
+            ptr: self.ptr,
+            len: self.len,
             ownership: not_owned(ctx),
         }
     }
@@ -193,17 +160,15 @@ impl ContextSpore for DevMemSpore {
     #[inline]
     unsafe fn kill(&mut self, ctx: &ContextGuard) {
         drop(DevMem {
-            slice: UnsafeCell::new(DevSlice {
-                ptr: take(&mut self.0.ptr),
-                len: self.0.len,
-            }),
+            ptr: take(&mut self.ptr),
+            len: self.len,
             ownership: owned(ctx),
         });
     }
 
     #[inline]
     fn is_alive(&self) -> bool {
-        self.0.ptr != cuda::CUdeviceptr::default()
+        self.ptr != cuda::CUdeviceptr::default()
     }
 }
 
@@ -212,10 +177,10 @@ impl<'ctx> ContextResource<'ctx> for DevMem<'ctx> {
 
     #[inline]
     fn sporulate(self) -> Self::Spore {
-        let ans = DevMemSpore(DevSlice {
+        let ans = DevMemSpore {
             ptr: self.ptr,
             len: self.len,
-        });
+        };
         forget(self);
         ans
     }

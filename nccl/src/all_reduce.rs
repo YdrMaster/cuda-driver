@@ -1,22 +1,21 @@
 ﻿use crate::{convert, Communicator, ReduceType};
-use cuda::{AsRaw, CudaDataType, DevSlice, Stream};
-use std::ffi::c_void;
+use cuda::{AsRaw, CudaDataType, DevByte, Stream};
 
 impl Communicator {
     pub fn all_reduce(
         &self,
-        dst: &mut DevSlice,
-        src: Option<&DevSlice>,
+        dst: &mut [DevByte],
+        src: Option<&[DevByte]>,
         dt: CudaDataType,
         op: ReduceType,
         stream: &Stream,
     ) {
         let size = dst.len();
-        let recvbuff = unsafe { dst.as_raw() as *mut c_void };
+        let recvbuff = dst.as_mut_ptr().cast();
         nccl!(ncclAllReduce(
             if let Some(src) = src {
                 assert_eq!(src.len(), size);
-                unsafe { src.as_raw() as _ }
+                src.as_ptr() as _
             } else {
                 recvbuff
             },
