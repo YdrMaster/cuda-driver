@@ -8,7 +8,12 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 static_assertions = "1.1"
+half_ = { version = "2.4", package = "half", optional = true }
 
 [build-dependencies]
 bindgen.workspace = true
 search-cuda-tools = { path = "../search-cuda-tools" }
+
+[features]
+default = ["half"]
+half = ["half_"]

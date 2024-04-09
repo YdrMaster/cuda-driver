@@ -31,11 +31,18 @@ pub use group::CommunicatorGroup;
 use bindings::ncclDataType_t;
 use cuda::CudaDataType;
 
-fn convert(data_type: cuda::CudaDataType) -> ncclDataType_t {
+#[inline]
+fn convert(data_type: CudaDataType) -> ncclDataType_t {
     match data_type {
-        CudaDataType::half => ncclDataType_t::ncclHalf,
-        CudaDataType::float => ncclDataType_t::ncclFloat,
-        CudaDataType::double => ncclDataType_t::ncclDouble,
-        CudaDataType::nv_bfloat16 => panic!("nv_bfloat16 is not supported by NCCL"),
+        CudaDataType::i8 => ncclDataType_t::ncclInt8,
+        CudaDataType::u8 => ncclDataType_t::ncclUint8,
+        CudaDataType::i32 => ncclDataType_t::ncclInt32,
+        CudaDataType::u32 => ncclDataType_t::ncclUint32,
+        CudaDataType::i64 => ncclDataType_t::ncclInt64,
+        CudaDataType::u64 => ncclDataType_t::ncclUint64,
+        CudaDataType::f16 => ncclDataType_t::ncclHalf,
+        CudaDataType::f32 => ncclDataType_t::ncclFloat,
+        CudaDataType::f64 => ncclDataType_t::ncclDouble,
+        dt => panic!("\"{}\" is not supported by NCCL", dt.name()),
     }
 }

@@ -1,6 +1,9 @@
 #![deny(warnings)]
 #![cfg(detected_cuda)]
 
+#[cfg(feature = "half")]
+pub extern crate half_ as half;
+
 #[macro_use]
 #[allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
 pub mod bindings {
@@ -30,6 +33,7 @@ pub mod bindings {
 }
 
 mod context;
+mod data_type;
 mod dev_mem;
 mod device;
 mod event;
@@ -55,41 +59,10 @@ pub use context::{
     ctx_eq, not_owned, owned, Context, ContextGuard, ContextResource, ContextSpore,
     ResourceOwnership,
 };
+pub use data_type::{CuTy, CudaDataType};
 pub use dev_mem::{memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
 pub use device::Device;
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{Dim3, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use stream::{Stream, StreamSpore};
-
-#[allow(non_camel_case_types)]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum CudaDataType {
-    half,
-    nv_bfloat16,
-    float,
-    double,
-}
-
-impl CudaDataType {
-    #[inline]
-    pub fn size(self) -> usize {
-        match self {
-            Self::half => 2,
-            Self::nv_bfloat16 => 2,
-            Self::float => 4,
-            Self::double => 8,
-        }
-    }
-
-    #[inline]
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::half => "half",
-            Self::nv_bfloat16 => "nv_bfloat16",
-            Self::float => "float",
-            Self::double => "double",
-        }
-    }
-}
