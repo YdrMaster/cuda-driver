@@ -1,16 +1,10 @@
-﻿use crate::{convert, Communicator};
-use cuda::{AsRaw, CudaDataType, DevByte, Stream};
+﻿use crate::Communicator;
+use cuda::{AsRaw, DevByte, Stream};
 use std::ffi::c_void;
 
 impl Communicator {
     #[inline]
-    pub fn all_gather(
-        &self,
-        dst: &mut [DevByte],
-        src: Option<&[DevByte]>,
-        dt: CudaDataType,
-        stream: &Stream,
-    ) {
+    pub fn all_gather(&self, dst: &mut [DevByte], src: Option<&[DevByte]>, stream: &Stream) {
         let size = {
             let count = self.count();
             assert_eq!(dst.len() % count, 0);
@@ -25,8 +19,8 @@ impl Communicator {
                 unsafe { recvbuff.add(self.rank() * size) }
             },
             recvbuff,
-            size / dt.size(),
-            convert(dt),
+            size,
+            ncclDataType_t::ncclUint8,
             self.as_raw(),
             stream.as_raw() as _,
         ));

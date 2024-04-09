@@ -1,6 +1,6 @@
 ﻿use crate::Communicator;
-use cuda::{Context, ContextGuard};
-use std::{ffi::c_int, ptr::null_mut};
+use cuda::Context;
+use std::{ffi::c_int, ops::Deref, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct CommunicatorGroup(Vec<Communicator>);
@@ -17,16 +17,41 @@ impl CommunicatorGroup {
     }
 
     #[inline]
-    pub fn context_iter(&self) -> impl Iterator<Item = Context> + '_ {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    #[inline]
+    pub fn contexts(&self) -> impl Iterator<Item = Context> + '_ {
         self.0.iter().map(|comm| comm.device().retain_primary())
     }
 
     #[inline]
-    pub fn apply(&self, mut f: impl FnMut(&Communicator, &ContextGuard)) {
+    pub fn call(&self) -> GroupGuard {
         nccl!(ncclGroupStart());
-        for comm in &self.0 {
-            comm.device().retain_primary().apply(|ctx| f(comm, ctx));
-        }
+        GroupGuard(&self.0)
+    }
+}
+
+#[repr(transparent)]
+pub struct GroupGuard<'a>(&'a [Communicator]);
+
+impl Deref for GroupGuard<'_> {
+    type Target = [Communicator];
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl Drop for GroupGuard<'_> {
+    #[inline]
+    fn drop(&mut self) {
         nccl!(ncclGroupEnd());
     }
 }
