@@ -126,17 +126,6 @@ impl DerefMut for DevMem<'_> {
     }
 }
 
-impl DevMem<'_> {
-    /// # Safety
-    ///
-    /// Mutable borrow from immutable reference.
-    #[allow(clippy::mut_from_ref)]
-    #[inline]
-    pub unsafe fn get_mut(&self) -> &mut [DevByte] {
-        unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
-    }
-}
-
 #[derive(PartialEq, Eq, Debug)]
 pub struct DevMemSpore {
     ptr: cuda::CUdeviceptr,

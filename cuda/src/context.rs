@@ -61,8 +61,6 @@ impl AsRaw for Context {
 }
 
 impl Context {
-    pub const DROP: &'static str = "Context spore must be killed manually.";
-
     #[inline]
     pub fn device(&self) -> Device {
         Device::new(self.dev)
