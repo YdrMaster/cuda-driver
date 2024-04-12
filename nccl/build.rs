@@ -1,11 +1,19 @@
 ﻿fn main() {
     use std::{env, path::PathBuf};
 
-    let Some(cuda_root) = search_cuda_tools::find_nccl() else {
+    let Some(cuda_root) = search_cuda_tools::find_cuda_root() else {
+        return;
+    };
+    let Some(nccl_root) = search_cuda_tools::find_nccl_root() else {
         return;
     };
     search_cuda_tools::detect_nccl();
     search_cuda_tools::include_cuda();
+
+    let mut includes = vec![format!("-I{}/include", cuda_root.display())];
+    if let Some(nccl_root) = nccl_root {
+        includes.push(format!("-I{}/include", nccl_root.display()));
+    }
 
     println!("cargo:rustc-link-lib=dylib=nccl");
 
@@ -17,7 +25,7 @@
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate bindings for.
         .header("wrapper.h")
-        .clang_arg(format!("-I{}/include", cuda_root.display()))
+        .clang_args(&includes)
         // Only generate bindings for the functions in these namespaces.
         .allowlist_function("nccl.*")
         .allowlist_item("nccl.*")
