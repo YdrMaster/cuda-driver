@@ -55,6 +55,7 @@ impl Ptx {
             );
             assert!(cccl.is_dir(), "cccl not exist");
             include_dir(&mut options, cccl.join("libcudacxx/include"));
+            include_dir(&mut options, cccl.join("libcudacxx/include/cuda/std"));
             if need_cub {
                 include_dir(&mut options, cccl.join("cub"));
             }
