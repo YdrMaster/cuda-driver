@@ -174,3 +174,15 @@ impl<'ctx> ContextResource<'ctx> for DevMem<'ctx> {
         ans
     }
 }
+
+impl ContextGuard<'_> {
+    #[inline]
+    pub unsafe fn sprout<S: ContextSpore>(&self, s: &S) -> S::Resource<'_> {
+        s.sprout(self)
+    }
+
+    #[inline]
+    pub unsafe fn kill<S: ContextSpore>(&self, s: &mut S) {
+        s.kill(self);
+    }
+}
