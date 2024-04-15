@@ -4,6 +4,9 @@ use cuda::{AsRaw, Device};
 #[repr(transparent)]
 pub struct Communicator(ncclComm_t);
 
+unsafe impl Send for Communicator {}
+unsafe impl Sync for Communicator {}
+
 impl Communicator {
     #[inline]
     pub fn count(&self) -> usize {
