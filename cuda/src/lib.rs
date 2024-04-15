@@ -60,7 +60,7 @@ pub use context::{
     ResourceOwnership,
 };
 pub use data_type::{CuTy, CudaDataType};
-pub use dev_mem::{memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
+pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
 pub use device::Device;
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
