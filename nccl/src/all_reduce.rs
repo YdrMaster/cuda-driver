@@ -34,7 +34,7 @@ fn test() {
     use cuda::ContextResource;
     use std::iter::zip;
 
-    const N: usize = 10 << 10; // 10K * sizeof::<f32>() = 40K bytes
+    const N: usize = 12 << 10; // 10K * sizeof::<f32>() = 40K bytes
 
     cuda::init();
 
@@ -52,7 +52,11 @@ fn test() {
         .map(|(i, comm)| {
             contexts[i].apply(|ctx| {
                 let stream = unsafe { ctx.sprout(&streams[i]) };
-                let mut mem = stream.from_host(&array);
+
+                let mut mem = ctx.malloc::<f32>(N);
+                // let mut mem = stream.malloc::<f32>(N); // stream ordered memory allocation is not allowed in NCCL
+
+                stream.memcpy_h2d(&mut mem, &array);
                 comm.all_reduce(
                     &mut mem,
                     None,
