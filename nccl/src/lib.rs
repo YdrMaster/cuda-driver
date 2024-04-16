@@ -21,6 +21,7 @@ pub mod bindings {
 
 mod all_gather;
 mod all_reduce;
+mod broadcast;
 mod communicator;
 mod group;
 
