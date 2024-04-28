@@ -121,6 +121,14 @@ impl<'ctx> Stream<'ctx> {
     }
 }
 
+impl DevMem<'_> {
+    #[inline]
+    pub fn drop_on(self, stream: &Stream) {
+        driver!(cuMemFreeAsync(self.ptr, stream.as_raw()));
+        forget(self);
+    }
+}
+
 impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
