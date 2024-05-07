@@ -15,7 +15,8 @@ pub fn find_nccl_root() -> Option<Option<PathBuf>> {
     if unsafe { String::from_utf8_unchecked(output.stdout) }.contains("libnccl.so") {
         Some(None)
     } else {
-        split_paths(&var_os("LD_LIBRARY_PATH")?)
+        split_paths(&var_os("LIBRARY_PATH")?)
+            .chain(split_paths(&var_os("LD_LIBRARY_PATH")?))
             .filter_map(|path| fs::read_dir(path).ok())
             .flat_map(|read_dir| read_dir)
             .filter_map(|result| result.ok())

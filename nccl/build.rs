@@ -12,7 +12,9 @@
 
     let mut includes = vec![format!("-I{}/include", cuda_root.display())];
     if let Some(nccl_root) = nccl_root {
-        includes.push(format!("-I{}/include", nccl_root.display()));
+        let nccl_root = nccl_root.display();
+        includes.push(format!("-I{nccl_root}/include"));
+        println!("cargo:rustc-link-search={nccl_root}/lib");
     }
 
     println!("cargo:rustc-link-lib=dylib=nccl");
