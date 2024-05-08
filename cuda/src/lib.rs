@@ -5,6 +5,9 @@
 pub extern crate half_ as half;
 
 #[macro_use]
+extern crate log;
+
+#[macro_use]
 #[allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
 pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

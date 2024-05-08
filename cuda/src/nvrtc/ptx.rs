@@ -11,8 +11,13 @@ pub struct Ptx(CString);
 impl Ptx {
     pub fn compile(code: impl AsRef<str>) -> (Result<Self, cuda::nvrtcResult>, String) {
         let code = code.as_ref();
-        let need_cub = code.contains("cub");
-        let need_thrust = code.contains("thrust");
+
+        let options = collect_options(code);
+        let options = options
+            .iter()
+            .map(|s| s.as_ptr().cast::<c_char>())
+            .collect::<Vec<_>>();
+
         let code = {
             let mut headers = String::new();
 
@@ -40,34 +45,6 @@ impl Ptx {
             null(),
             null(),
         ));
-
-        let mut options = vec![
-            CString::new("--std=c++17").unwrap(),
-            CString::new("--gpu-architecture=compute_80").unwrap(),
-        ];
-        fn include_dir(options: &mut Vec<CString>, dir: impl AsRef<Path>) {
-            options.push(CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap());
-        }
-        if need_cub || need_thrust {
-            let cccl = std::option_env!("CCCL_ROOT").map_or_else(
-                || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cccl"),
-                PathBuf::from,
-            );
-            assert!(cccl.is_dir(), "cccl not exist");
-            include_dir(&mut options, cccl.join("libcudacxx/include"));
-            include_dir(&mut options, cccl.join("libcudacxx/include/cuda/std"));
-            if need_cub {
-                include_dir(&mut options, cccl.join("cub"));
-            }
-            if need_thrust {
-                include_dir(&mut options, cccl.join("thrust"));
-            }
-        }
-        options.push(CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap());
-        let options = options
-            .iter()
-            .map(|s| s.as_ptr().cast::<c_char>())
-            .collect::<Vec<_>>();
 
         let result =
             unsafe { cuda::nvrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
@@ -109,4 +86,38 @@ impl Ptx {
     pub fn as_ptr(&self) -> *const c_char {
         self.0.as_ptr()
     }
+}
+
+fn collect_options(code: &str) -> Vec<CString> {
+    let mut options = vec![
+        CString::new("--std=c++17").unwrap(),
+        CString::new("--gpu-architecture=compute_80").unwrap(),
+    ];
+    fn include_dir(dir: impl AsRef<Path>) -> CString {
+        CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap()
+    }
+    let cccl = std::option_env!("CCCL_ROOT").map_or_else(
+        || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cccl"),
+        PathBuf::from,
+    );
+    if cccl.is_dir() {
+        options.push(include_dir(cccl.join("libcudacxx/include")));
+        options.push(include_dir(cccl.join("libcudacxx/include/cuda/std")));
+        options.push(include_dir(cccl.join("cub")));
+        options.push(include_dir(cccl.join("thrust")));
+    } else if code.contains("cub") || code.contains("thrust") {
+        warn!("cccl not found, but cub or thrust is used in code");
+    }
+    let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
+        || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),
+        PathBuf::from,
+    );
+    if cutlass.is_dir() {
+        options.push(include_dir(cutlass.join("include")));
+        options.push(CString::new("-default-device").unwrap());
+    } else if code.contains("cutlass") || code.contains("cute") {
+        warn!("cutlass not found, but cutlass or cute is used in code");
+    }
+    options.push(CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap());
+    options
 }
