@@ -140,6 +140,22 @@ impl ContextGuard<'_> {
     pub fn synchronize(&self) {
         driver!(cuCtxSynchronize());
     }
+
+    /// # Safety
+    ///
+    /// See [`ContextSpore::sprout`].
+    #[inline]
+    pub unsafe fn sprout<S: ContextSpore>(&self, s: &S) -> S::Resource<'_> {
+        s.sprout(self)
+    }
+
+    /// # Safety
+    ///
+    /// See [`ContextSpore::kill`].
+    #[inline]
+    pub unsafe fn kill<S: ContextSpore>(&self, s: &mut S) {
+        s.kill(self);
+    }
 }
 
 pub trait ContextResource<'ctx> {

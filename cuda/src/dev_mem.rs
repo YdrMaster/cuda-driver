@@ -161,6 +161,13 @@ pub struct DevMemSpore {
 
 spore_convention!(DevMemSpore);
 
+impl DevMemSpore {
+    #[inline]
+    pub unsafe fn kill_on(&mut self, stream: &Stream) {
+        driver!(cuMemFreeAsync(take(&mut self.ptr), stream.as_raw()));
+    }
+}
+
 impl ContextSpore for DevMemSpore {
     type Resource<'ctx> = DevMem<'ctx>;
 
@@ -199,22 +206,5 @@ impl<'ctx> ContextResource<'ctx> for DevMem<'ctx> {
         };
         forget(self);
         ans
-    }
-}
-
-impl ContextGuard<'_> {
-    /// # Safety
-    ///
-    /// See [`ContextSpore::sprout`].
-    #[inline]
-    pub unsafe fn sprout<S: ContextSpore>(&self, s: &S) -> S::Resource<'_> {
-        s.sprout(self)
-    }
-    /// # Safety
-    ///
-    /// See [`ContextSpore::kill`].
-    #[inline]
-    pub unsafe fn kill<S: ContextSpore>(&self, s: &mut S) {
-        s.kill(self);
     }
 }
