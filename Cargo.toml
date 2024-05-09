@@ -1,5 +1,5 @@
 [workspace]
-members = ["cuda", "cublas", "nccl", "search-cuda-tools"]
+members = ["cuda", "cublas", "nccl", "search-cuda-tools", "cutlass-bench"]
 resolver = "2"
 
 [workspace.dependencies]
