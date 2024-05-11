@@ -5,6 +5,14 @@ use std::{ffi::c_int, ops::Deref, ptr::null_mut};
 #[repr(transparent)]
 pub struct CommunicatorGroup(Vec<Communicator>);
 
+impl Deref for CommunicatorGroup {
+    type Target = [Communicator];
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl CommunicatorGroup {
     pub fn new(devlist: &[c_int]) -> Self {
         let mut comms = vec![null_mut(); devlist.len()];
