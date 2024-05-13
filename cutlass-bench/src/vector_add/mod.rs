@@ -1,9 +1,4 @@
-fn main() {
-    #[cfg(detected_cuda)]
-    bench();
-}
-
-#[cfg(detected_cuda)]
+﻿#[test]
 fn bench() {
     use cuda::{memcpy_d2h, Ptx};
     use half::f16;
@@ -19,7 +14,7 @@ fn bench() {
 
     const ITEMS_PER_THREAD: usize = 8;
 
-    const NORMAL: &str = include_str!("vector_add.cuh");
+    const NORMAL: &str = include_str!("cuda_c.cuh");
     const NORMAL_NAME: &str = "normal";
     let normal_name = CString::new(NORMAL_NAME).unwrap();
     let normal_ptx = {
@@ -49,7 +44,7 @@ extern "C" __global__ void {NORMAL_NAME}(
         result.unwrap()
     };
 
-    const CUTLASS: &str = include_str!("cutlass_add.cuh");
+    const CUTLASS: &str = include_str!("cutlass.cuh");
     const CUTLASS_NAME: &str = "cutlass_";
     let cutlass_name = CString::new(CUTLASS_NAME).unwrap();
     let cutlass_ptx = {
@@ -82,7 +77,7 @@ extern "C" __global__ void {CUTLASS_NAME}(
     dev.context().apply(|ctx| {
         let stream = ctx.stream();
 
-        let len = 128 * 1024 * 1024 * ITEMS_PER_THREAD;
+        let len = 128 * 1024 * ITEMS_PER_THREAD;
         let mut z = vec![f16::default(); len];
         let x = vec![f16::from_f32(1.); len];
         let y = vec![f16::from_f32(2.); len];
@@ -111,10 +106,10 @@ extern "C" __global__ void {CUTLASS_NAME}(
         let cutlass = ctx.load(&cutlass_ptx);
         let cutlass = cutlass.get_kernel(&cutlass_name);
 
-        normal.launch(128 * 1024, 1024, params.as_ptr(), 0, Some(&stream));
+        normal.launch(128, 1024, params.as_ptr(), 0, Some(&stream));
         memcpy_d2h(&mut z, &dev_z);
         assert!(z.iter().all(|&x| x == f16::from_f32(7.)));
-        cutlass.launch(128 * 1024, 1024, params.as_ptr(), 0, Some(&stream));
+        cutlass.launch(128, 1024, params.as_ptr(), 0, Some(&stream));
         memcpy_d2h(&mut z, &dev_z);
         assert!(z.iter().all(|&x| x == f16::from_f32(7.)));
     });
