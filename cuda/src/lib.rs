@@ -64,7 +64,7 @@ pub use context::{
 };
 pub use data_type::{CuTy, CudaDataType};
 pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
-pub use device::Device;
+pub use device::{ComputeCapability, Device};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{Dim3, KernelFn, Module, ModuleSpore, Ptx, Symbol};

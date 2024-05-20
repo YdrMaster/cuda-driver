@@ -29,7 +29,7 @@ extern "C" __global__ void {NORMAL_NAME}(
 }}
 "#
         );
-        let (result, log) = Ptx::compile(code);
+        let (result, log) = Ptx::compile(code, dev.compute_capability());
         if !log.trim().is_empty() {
             println!("{log}");
         }
@@ -53,7 +53,7 @@ extern "C" __global__ void {CUTLASS_NAME}(
 }}
 "#
         );
-        let (result, log) = Ptx::compile(code);
+        let (result, log) = Ptx::compile(code, dev.compute_capability());
         if !log.trim().is_empty() {
             println!("{log}");
         }

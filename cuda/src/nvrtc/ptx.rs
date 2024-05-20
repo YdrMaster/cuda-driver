@@ -1,4 +1,4 @@
-﻿use crate::bindings as cuda;
+﻿use crate::{bindings as cuda, ComputeCapability};
 use core::fmt;
 use std::{
     ffi::{c_char, CString},
@@ -9,10 +9,13 @@ use std::{
 pub struct Ptx(CString);
 
 impl Ptx {
-    pub fn compile(code: impl AsRef<str>) -> (Result<Self, cuda::nvrtcResult>, String) {
+    pub fn compile(
+        code: impl AsRef<str>,
+        cc: ComputeCapability,
+    ) -> (Result<Self, cuda::nvrtcResult>, String) {
         let code = code.as_ref();
 
-        let options = collect_options(code);
+        let options = collect_options(code, cc);
         let options = options
             .iter()
             .map(|s| s.as_ptr().cast::<c_char>())
@@ -88,10 +91,14 @@ impl Ptx {
     }
 }
 
-fn collect_options(code: &str) -> Vec<CString> {
+fn collect_options(code: &str, cc: ComputeCapability) -> Vec<CString> {
     let mut options = vec![
         CString::new("--std=c++17").unwrap(),
-        CString::new("--gpu-architecture=compute_80").unwrap(),
+        CString::new(format!(
+            "--gpu-architecture=compute_{}",
+            cc.to_arch_string()
+        ))
+        .unwrap(),
     ];
     fn include_dir(dir: impl AsRef<Path>) -> CString {
         CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap()

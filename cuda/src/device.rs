@@ -1,5 +1,6 @@
 ﻿use crate::{bindings as cuda, AsRaw, Dim3};
-use std::{ffi::c_int, ptr::null_mut};
+use core::fmt;
+use std::{cmp::Ordering, ffi::c_int, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct Device(cuda::CUdevice);
@@ -37,11 +38,11 @@ impl Device {
     }
 
     #[inline]
-    pub fn compute_capability(&self) -> (i32, i32) {
+    pub fn compute_capability(&self) -> ComputeCapability {
         let mut major = 0;
         let mut minor = 0;
         driver!(cuDeviceComputeCapability(&mut major, &mut minor, self.0));
-        (major, minor)
+        ComputeCapability { major, minor }
     }
 
     #[inline]
@@ -87,15 +88,52 @@ impl Device {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ComputeCapability {
+    pub major: i32,
+    pub minor: i32,
+}
+
+impl ComputeCapability {
+    #[inline]
+    pub fn to_arch_string(&self) -> String {
+        format!("{}{}", self.major, self.minor)
+    }
+}
+
+impl PartialOrd for ComputeCapability {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ComputeCapability {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.major.cmp(&self.major) {
+            Ordering::Equal => self.minor.cmp(&other.minor),
+            other => other,
+        }
+    }
+}
+
+impl fmt::Display for ComputeCapability {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
+    }
+}
+
 #[test]
 fn test() {
     crate::init();
     for i in 0..Device::count() {
         let dev = Device::new(i as _);
-        let (major, minor) = dev.compute_capability();
+        let cc = dev.compute_capability();
         let (max_threads, max_block_dims) = dev.max_block_dims();
         println!(
-            "gpu{i}: ver{major}.{minor} mem={}, max_threads_per_block={}, max_block_dims={:?}",
+            "gpu{i}: ver{cc} mem={}, max_threads_per_block={}, max_block_dims={:?}",
             dev.total_memory(),
             max_threads,
             max_block_dims,

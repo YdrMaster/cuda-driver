@@ -162,6 +162,9 @@ pub struct DevMemSpore {
 spore_convention!(DevMemSpore);
 
 impl DevMemSpore {
+    /// # Safety
+    ///
+    /// This function must be called in the same context as the one that created the resource.
     #[inline]
     pub unsafe fn kill_on(&mut self, stream: &Stream) {
         driver!(cuMemFreeAsync(take(&mut self.ptr), stream.as_raw()));
