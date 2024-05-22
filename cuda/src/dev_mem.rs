@@ -124,8 +124,10 @@ impl<'ctx> Stream<'ctx> {
 impl DevMem<'_> {
     #[inline]
     pub fn drop_on(self, stream: &Stream) {
-        driver!(cuMemFreeAsync(self.ptr, stream.as_raw()));
-        forget(self);
+        if self.ownership.is_owned() {
+            driver!(cuMemFreeAsync(self.ptr, stream.as_raw()));
+            forget(self);
+        }
     }
 }
 
