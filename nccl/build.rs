@@ -1,14 +1,16 @@
 ﻿fn main() {
+    use search_cuda_tools::{allow_cfg, detect, find_cuda_root, find_nccl_root, include_cuda};
     use std::{env, path::PathBuf};
 
-    let Some(cuda_root) = search_cuda_tools::find_cuda_root() else {
+    allow_cfg("nccl");
+    let Some(cuda_root) = find_cuda_root() else {
         return;
     };
-    let Some(nccl_root) = search_cuda_tools::find_nccl_root() else {
+    let Some(nccl_root) = find_nccl_root() else {
         return;
     };
-    search_cuda_tools::detect_nccl();
-    search_cuda_tools::include_cuda();
+    detect("nccl");
+    include_cuda();
 
     let mut includes = vec![format!("-I{}/include", cuda_root.display())];
     if let Some(nccl_root) = nccl_root {

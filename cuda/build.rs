@@ -1,11 +1,13 @@
 ﻿fn main() {
+    use search_cuda_tools::{allow_cfg, detect, find_cuda_root, include_cuda};
     use std::{env, path::PathBuf};
 
-    let Some(cuda_root) = search_cuda_tools::find_cuda_root() else {
+    allow_cfg("cuda");
+    let Some(cuda_root) = find_cuda_root() else {
         return;
     };
-    search_cuda_tools::detect_cuda();
-    search_cuda_tools::include_cuda();
+    detect("cuda");
+    include_cuda();
 
     println!("cargo:rustc-link-lib=dylib=nvrtc");
     println!("cargo:rustc-env=CUDA_ROOT={}", cuda_root.display());

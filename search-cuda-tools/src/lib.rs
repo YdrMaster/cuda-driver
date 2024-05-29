@@ -1,6 +1,6 @@
 use std::{
     env::{split_paths, var_os},
-    fs,
+    fmt, fs,
     path::PathBuf,
     process::Command,
 };
@@ -30,11 +30,11 @@ pub fn find_nccl_root() -> Option<Option<PathBuf>> {
 }
 
 #[inline]
-pub fn detect_cuda() {
-    println!("cargo:rustc-cfg=detected_cuda");
+pub fn allow_cfg(name: impl fmt::Display) {
+    println!("cargo::rustc-check-cfg=cfg(detected_{name})");
 }
 
 #[inline]
-pub fn detect_nccl() {
-    println!("cargo:rustc-cfg=detected_nccl");
+pub fn detect(name: impl fmt::Display) {
+    println!("cargo:rustc-cfg=detected_{name}");
 }
