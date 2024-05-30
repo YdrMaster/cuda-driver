@@ -144,14 +144,22 @@ impl Deref for DevMem<'_> {
     type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.ptr as _, self.len) }
+        if self.len == 0 {
+            &[]
+        } else {
+            unsafe { from_raw_parts(self.ptr as _, self.len) }
+        }
     }
 }
 
 impl DerefMut for DevMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
+        if self.len == 0 {
+            &mut []
+        } else {
+            unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
+        }
     }
 }
 
