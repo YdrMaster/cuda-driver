@@ -1,0 +1,11 @@
+[package]
+name = "try-cuda"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cuda = { path = "../cuda" }
+
+[build-dependencies]
+build-script-cfg.workspace = true
+search-cuda-tools = { path = "../search-cuda-tools" }
