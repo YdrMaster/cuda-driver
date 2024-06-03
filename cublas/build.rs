@@ -1,12 +1,12 @@
 ﻿fn main() {
-    use search_cuda_tools::{allow_cfg, detect, find_cuda_root, include_cuda};
+    use search_cuda_tools::{find_cuda_root, include_cuda, Cfg};
     use std::{env, path::PathBuf};
 
-    allow_cfg("cuda");
+    let cuda = Cfg::new("cuda");
     let Some(cuda_root) = find_cuda_root() else {
         return;
     };
-    detect("cuda");
+    cuda.detect();
     include_cuda();
 
     println!("cargo:rustc-link-lib=dylib=cublas");

@@ -29,12 +29,19 @@ pub fn find_nccl_root() -> Option<Option<PathBuf>> {
     }
 }
 
-#[inline]
-pub fn allow_cfg(name: impl fmt::Display) {
-    println!("cargo::rustc-check-cfg=cfg(detected_{name})");
-}
+#[derive(Clone, PartialEq, Eq, Debug)]
+#[repr(transparent)]
+pub struct Cfg<S>(S);
 
-#[inline]
-pub fn detect(name: impl fmt::Display) {
-    println!("cargo:rustc-cfg=detected_{name}");
+impl<S: fmt::Display> Cfg<S> {
+    #[inline]
+    pub fn new(name: S) -> Self {
+        println!("cargo::rustc-check-cfg=cfg(detected_{name})");
+        Self(name)
+    }
+
+    #[inline]
+    pub fn detect(&self) {
+        println!("cargo:rustc-cfg=detected_{}", self.0);
+    }
 }

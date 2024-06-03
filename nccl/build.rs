@@ -1,15 +1,15 @@
 ﻿fn main() {
-    use search_cuda_tools::{allow_cfg, detect, find_cuda_root, find_nccl_root, include_cuda};
+    use search_cuda_tools::{find_cuda_root, find_nccl_root, include_cuda, Cfg};
     use std::{env, path::PathBuf};
 
-    allow_cfg("nccl");
+    let nccl = Cfg::new("nccl");
     let Some(cuda_root) = find_cuda_root() else {
         return;
     };
     let Some(nccl_root) = find_nccl_root() else {
         return;
     };
-    detect("nccl");
+    nccl.detect();
     include_cuda();
 
     let mut includes = vec![format!("-I{}/include", cuda_root.display())];
