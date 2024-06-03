@@ -2,10 +2,7 @@
 fn bench() {
     use cuda::{memcpy_d2h, Ptx};
     use half::f16;
-    use std::{
-        ffi::{c_void, CString},
-        time::Instant,
-    };
+    use std::{ffi::CString, time::Instant};
 
     cuda::init();
     let Some(dev) = cuda::Device::fetch() else {
@@ -91,15 +88,7 @@ extern "C" __global__ void {CUTLASS_NAME}(
         let ptr_z = dev_z.as_mut_ptr();
         let ptr_x = dev_x.as_ptr();
         let ptr_y = dev_y.as_ptr();
-        let params: [*const c_void; 7] = [
-            (&ptr_z) as *const _ as _,
-            (&ptr_x) as *const _ as _,
-            (&ptr_y) as *const _ as _,
-            (&2.0f32) as *const _ as _,
-            (&2.0f32) as *const _ as _,
-            (&1.0f32) as *const _ as _,
-            (&len) as *const _ as _,
-        ];
+        let params = cuda::params![ptr_z, ptr_x, ptr_y, 2.0f32, 2.0f32, 1.0f32, len];
 
         let normal = ctx.load(&normal_ptx);
         let normal = normal.get_kernel(&normal_name);

@@ -67,5 +67,5 @@ pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpo
 pub use device::{ComputeCapability, Device};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
-pub use nvrtc::{Dim3, KernelFn, Module, ModuleSpore, Ptx, Symbol};
+pub use nvrtc::{AsParam, Dim3, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use stream::{Stream, StreamSpore};

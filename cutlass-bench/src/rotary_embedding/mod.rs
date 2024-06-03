@@ -2,10 +2,7 @@
 fn bench() {
     use cuda::{memcpy_d2h, Ptx};
     use half::f16;
-    use std::{
-        ffi::{c_void, CString},
-        time::Instant,
-    };
+    use std::{ffi::CString, time::Instant};
 
     cuda::init();
     let Some(dev) = cuda::Device::fetch() else {
@@ -73,29 +70,15 @@ extern "C" __global__ void {CUTLASS_NAME}(
         let theta = 1e10f32;
         let leading_dim = 0;
         let time = Instant::now();
-        let dev_x = stream.from_host(&x);
-        let dev_x_cutlass = stream.from_host(&x_cutlass);
+        let mut dev_x = stream.from_host(&x);
+        let mut dev_x_cutlass = stream.from_host(&x_cutlass);
         let dev_pos = stream.from_host(&pos);
         println!("malloc {:?}", time.elapsed());
-        let ptr_x = dev_x.as_ptr();
-        let ptr_x_cutlass = dev_x_cutlass.as_ptr();
+        let ptr_x = dev_x.as_mut_ptr();
+        let ptr_x_cutlass = dev_x_cutlass.as_mut_ptr();
         let ptr_pos = dev_pos.as_ptr();
-        let params: [*const c_void; 6] = [
-            (&ptr_x) as *const _ as _,
-            (&ptr_pos) as *const _ as _,
-            (&theta) as *const _ as _,
-            (&leading_dim) as *const _ as _,
-            (&nt) as *const _ as _,
-            (&nh) as *const _ as _,
-        ];
-        let params_cutlass: [*const c_void; 6] = [
-            (&ptr_x_cutlass) as *const _ as _,
-            (&ptr_pos) as *const _ as _,
-            (&theta) as *const _ as _,
-            (&leading_dim) as *const _ as _,
-            (&nt) as *const _ as _,
-            (&nh) as *const _ as _,
-        ];
+        let params = cuda::params![ptr_x, ptr_pos, theta, leading_dim, nt, nh];
+        let params_cutlass = cuda::params![ptr_x_cutlass, ptr_pos, theta, leading_dim, nt, nh];
 
         let normal = ctx.load(&normal_ptx);
         let normal = normal.get_kernel(&normal_name);
