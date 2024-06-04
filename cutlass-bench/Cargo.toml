@@ -10,4 +10,5 @@ cuda = { path = "../cuda" }
 half = "2.4"
 
 [build-dependencies]
+build-script-cfg.workspace = true
 search-cuda-tools = { path = "../search-cuda-tools" }

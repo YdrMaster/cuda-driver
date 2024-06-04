@@ -1,15 +1,18 @@
 ﻿fn main() {
-    use search_cuda_tools::{find_cuda_root, find_nccl_root, include_cuda, Cfg};
+    use build_script_cfg::Cfg;
+    use search_cuda_tools::{find_cuda_root, find_nccl_root, include_cuda};
     use std::{env, path::PathBuf};
 
-    let nccl = Cfg::new("nccl");
+    println!("cargo:rerun-if-changed=build.rs");
+
+    let nccl = Cfg::new("detected_nccl");
     let Some(cuda_root) = find_cuda_root() else {
         return;
     };
     let Some(nccl_root) = find_nccl_root() else {
         return;
     };
-    nccl.detect();
+    nccl.define();
     include_cuda();
 
     let mut includes = vec![format!("-I{}/include", cuda_root.display())];

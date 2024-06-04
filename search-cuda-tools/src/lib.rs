@@ -1,6 +1,6 @@
 use std::{
     env::{split_paths, var_os},
-    fmt, fs,
+    fs,
     path::PathBuf,
     process::Command,
 };
@@ -26,22 +26,5 @@ pub fn find_nccl_root() -> Option<Option<PathBuf>> {
             .parent()
             .filter(|root| root.join("include/nccl.h").is_file())
             .map(|path| Some(path.into()))
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-#[repr(transparent)]
-pub struct Cfg<S>(S);
-
-impl<S: fmt::Display> Cfg<S> {
-    #[inline]
-    pub fn new(name: S) -> Self {
-        println!("cargo::rustc-check-cfg=cfg(detected_{name})");
-        Self(name)
-    }
-
-    #[inline]
-    pub fn detect(&self) {
-        println!("cargo:rustc-cfg=detected_{}", self.0);
     }
 }

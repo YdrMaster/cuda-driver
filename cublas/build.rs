@@ -1,12 +1,15 @@
 ﻿fn main() {
-    use search_cuda_tools::{find_cuda_root, include_cuda, Cfg};
+    use build_script_cfg::Cfg;
+    use search_cuda_tools::{find_cuda_root, include_cuda};
     use std::{env, path::PathBuf};
 
-    let cuda = Cfg::new("cuda");
+    println!("cargo:rerun-if-changed=build.rs");
+
+    let cuda = Cfg::new("detected_cuda");
     let Some(cuda_root) = find_cuda_root() else {
         return;
     };
-    cuda.detect();
+    cuda.define();
     include_cuda();
 
     println!("cargo:rustc-link-lib=dylib=cublas");

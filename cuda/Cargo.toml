@@ -13,6 +13,7 @@ log = "0.4"
 
 [build-dependencies]
 bindgen.workspace = true
+build-script-cfg.workspace = true
 search-cuda-tools = { path = "../search-cuda-tools" }
 
 [features]
