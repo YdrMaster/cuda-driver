@@ -1,6 +1,6 @@
-﻿use crate::{bindings as cuda, AsRaw, DevByte, Module, Stream};
+﻿use crate::{bindings as cuda, AsRaw, DevByte, Dim3, Module, Stream};
 use std::{
-    ffi::{c_uint, c_void, CStr},
+    ffi::{c_void, CStr},
     ptr::null_mut,
 };
 
@@ -43,41 +43,6 @@ impl KernelFn<'_> {
             params as _,
             null_mut(),
         ));
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Dim3 {
-    pub x: c_uint,
-    pub y: c_uint,
-    pub z: c_uint,
-}
-
-impl From<()> for Dim3 {
-    #[inline]
-    fn from(_: ()) -> Self {
-        Self { x: 1, y: 1, z: 1 }
-    }
-}
-
-impl From<c_uint> for Dim3 {
-    #[inline]
-    fn from(x: c_uint) -> Self {
-        Self { x, y: 1, z: 1 }
-    }
-}
-
-impl From<(c_uint, c_uint)> for Dim3 {
-    #[inline]
-    fn from((y, x): (c_uint, c_uint)) -> Self {
-        Self { x, y, z: 1 }
-    }
-}
-
-impl From<(c_uint, c_uint, c_uint)> for Dim3 {
-    #[inline]
-    fn from((z, y, x): (c_uint, c_uint, c_uint)) -> Self {
-        Self { x, y, z }
     }
 }
 

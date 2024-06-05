@@ -1,6 +1,5 @@
 ﻿use crate::{bindings as cuda, AsRaw, Dim3};
-use core::fmt;
-use std::{cmp::Ordering, ffi::c_int, ptr::null_mut};
+use std::{cmp::Ordering, ffi::c_int, fmt, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct Device(cuda::CUdevice);

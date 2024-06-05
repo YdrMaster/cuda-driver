@@ -1,5 +1,6 @@
 ﻿use crate::{bindings as cuda, ComputeCapability};
 use core::fmt;
+use log::warn;
 use std::{
     ffi::{c_char, CString},
     path::{Path, PathBuf},

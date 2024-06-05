@@ -2,7 +2,7 @@
 mod module;
 mod ptx;
 
-pub use kernel_fn::{AsParam, Dim3, KernelFn};
+pub use kernel_fn::{AsParam, KernelFn};
 pub use module::{Module, ModuleSpore};
 pub use ptx::Ptx;
 

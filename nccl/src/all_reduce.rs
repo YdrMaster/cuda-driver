@@ -31,7 +31,7 @@ impl Communicator {
 
 #[test]
 fn test() {
-    use cuda::ContextResource;
+    use cuda::{ContextResource, ContextSpore};
     use std::iter::zip;
 
     const N: usize = 12 << 10; // 10K * sizeof::<f32>() = 40K bytes
@@ -41,7 +41,7 @@ fn test() {
     let mut array = [1.0f32; N];
     let group = crate::CommunicatorGroup::new(&[0, 1]);
     let contexts = group.contexts().collect::<Vec<_>>();
-    let mut streams = contexts
+    let streams = contexts
         .iter()
         .map(|context| context.apply(|ctx| ctx.stream().sporulate()))
         .collect::<Vec<_>>();
@@ -51,7 +51,7 @@ fn test() {
         .enumerate()
         .map(|(i, comm)| {
             contexts[i].apply(|ctx| {
-                let stream = unsafe { ctx.sprout(&streams[i]) };
+                let stream = streams[i].sprout_ref(ctx);
 
                 let mut mem = ctx.malloc::<f32>(N);
                 // let mut mem = stream.malloc::<f32>(N); // stream ordered memory allocation is not allowed in NCCL
@@ -69,14 +69,12 @@ fn test() {
         })
         .collect::<Vec<_>>();
 
-    for (i, (context, mut mem)) in zip(contexts, mem).enumerate() {
+    for (context, (stream, mem)) in zip(contexts, zip(streams, mem)) {
         context.apply(|ctx| {
             ctx.synchronize();
-            cuda::memcpy_d2h(&mut array, unsafe { &*ctx.sprout(&mem) });
+            cuda::memcpy_d2h(&mut array, &*mem.sprout(ctx));
             assert_eq!(array, [2.; N]);
-
-            unsafe { ctx.kill(&mut mem) };
-            unsafe { ctx.kill(&mut streams[i]) };
+            stream.sprout(ctx);
         });
     }
 }

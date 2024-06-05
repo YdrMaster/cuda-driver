@@ -1,7 +1,7 @@
-﻿use crate::{bindings as cuda, AsRaw, Device};
+﻿use crate::{bindings as cuda, AsRaw, Device, ResourceWrapper};
 use std::ptr::null_mut;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Context {
     ctx: cuda::CUcontext,
     dev: cuda::CUdevice,
@@ -10,20 +10,6 @@ pub struct Context {
 
 static_assertions::assert_eq_size!(Context, [usize; 2]);
 static_assertions::assert_eq_align!(Context, usize);
-
-unsafe impl Send for Context {}
-unsafe impl Sync for Context {}
-
-impl Drop for Context {
-    #[inline]
-    fn drop(&mut self) {
-        if self.primary {
-            driver!(cuDevicePrimaryCtxRelease_v2(self.dev));
-        } else {
-            driver!(cuCtxDestroy_v2(self.ctx));
-        }
-    }
-}
 
 impl Device {
     #[inline]
@@ -52,6 +38,20 @@ impl Device {
     }
 }
 
+impl Drop for Context {
+    #[inline]
+    fn drop(&mut self) {
+        if self.primary {
+            driver!(cuDevicePrimaryCtxRelease_v2(self.dev));
+        } else {
+            driver!(cuCtxDestroy_v2(self.ctx));
+        }
+    }
+}
+
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
+
 impl AsRaw for Context {
     type Raw = cuda::CUcontext;
     #[inline]
@@ -69,14 +69,6 @@ impl Context {
     #[inline]
     pub fn apply<T>(&self, f: impl FnOnce(&ContextGuard) -> T) -> T {
         f(&self.push())
-    }
-
-    #[inline]
-    pub fn check_eq(
-        a: &impl AsRaw<Raw = cuda::CUcontext>,
-        b: &impl AsRaw<Raw = cuda::CUcontext>,
-    ) -> bool {
-        unsafe { a.as_raw() == b.as_raw() }
     }
 }
 
@@ -108,17 +100,10 @@ impl AsRaw for ContextGuard<'_> {
     }
 }
 
-#[inline]
-pub fn ctx_eq(a: &ContextGuard, b: &ContextGuard) -> bool {
-    a.0.ctx == b.0.ctx
-}
-
 impl ContextGuard<'_> {
     #[inline]
     pub fn dev(&self) -> Device {
-        let mut dev = 0;
-        driver!(cuCtxGetDevice(&mut dev));
-        Device::new(dev)
+        Device::new(self.0.dev)
     }
 
     /// 将一段 host 存储空间注册为锁页内存，以允许从这个上下文直接访问。
@@ -141,81 +126,13 @@ impl ContextGuard<'_> {
         driver!(cuCtxSynchronize());
     }
 
-    /// # Safety
-    ///
-    /// See [`ContextSpore::sprout`].
     #[inline]
-    pub unsafe fn sprout<S: ContextSpore>(&self, s: &S) -> S::Resource<'_> {
-        s.sprout(self)
-    }
-
-    /// # Safety
-    ///
-    /// See [`ContextSpore::kill`].
-    #[inline]
-    pub unsafe fn kill<S: ContextSpore>(&self, s: &mut S) {
-        s.kill(self);
-    }
-}
-
-pub trait ContextResource<'ctx> {
-    type Spore: ContextSpore<Resource<'ctx> = Self>;
-
-    fn sporulate(self) -> Self::Spore;
-}
-
-pub trait ContextSpore: 'static + Send + Sync {
-    type Resource<'ctx>: ContextResource<'ctx, Spore = Self>;
-
-    /// # Safety
-    ///
-    /// This function must be called in the same context as the one that created the resource.
-    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx>;
-    /// # Safety
-    ///
-    /// This function must be called in the same context as the one that created the resource.
-    unsafe fn kill(&mut self, ctx: &ContextGuard);
-    fn is_alive(&self) -> bool;
-}
-
-pub struct ResourceOwnership<'ctx>(bool, &'ctx ContextGuard<'ctx>);
-
-#[inline(always)]
-pub const fn owned<'ctx>(ctx: &'ctx ContextGuard) -> ResourceOwnership<'ctx> {
-    ResourceOwnership(true, ctx)
-}
-
-#[inline(always)]
-pub const fn not_owned<'ctx>(ctx: &'ctx ContextGuard) -> ResourceOwnership<'ctx> {
-    ResourceOwnership(false, ctx)
-}
-
-impl<'ctx> ResourceOwnership<'ctx> {
-    #[inline]
-    pub const fn is_owned(&self) -> bool {
-        self.0
-    }
-
-    #[inline]
-    pub const fn ctx(&self) -> &'ctx ContextGuard<'ctx> {
-        self.1
-    }
-}
-
-#[macro_export]
-macro_rules! spore_convention {
-    ($spore:ty) => {
-        unsafe impl Send for $spore {}
-        unsafe impl Sync for $spore {}
-        impl Drop for $spore {
-            #[inline]
-            fn drop(&mut self) {
-                if self.is_alive() {
-                    unreachable!("Context spore must be killed manually.");
-                }
-            }
+    pub unsafe fn wrap_resource<T>(&self, res: T) -> ResourceWrapper<T> {
+        ResourceWrapper {
+            ctx: self.0.ctx,
+            res,
         }
-    };
+    }
 }
 
 #[test]

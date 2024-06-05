@@ -1,30 +1,22 @@
-﻿use crate::{
-    bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
-    ContextGuard, ContextResource, ContextSpore,
-};
-use std::{
-    mem::{forget, replace},
-    ptr::null_mut,
-};
+﻿use crate::{bindings as cuda, impl_spore, AsRaw, ContextGuard, ResourceWrapper};
+use std::{marker::PhantomData, ptr::null_mut};
 
-pub struct Stream<'ctx>(cuda::CUstream, ResourceOwnership<'ctx>);
+impl_spore!(Stream and StreamSpore by cuda::CUstream);
 
 impl ContextGuard<'_> {
     #[inline]
     pub fn stream(&self) -> Stream {
         let mut stream = null_mut();
         driver!(cuStreamCreate(&mut stream, 0));
-        Stream(stream, owned(self))
+        Stream(unsafe { self.wrap_resource(stream) }, PhantomData)
     }
 }
 
 impl Drop for Stream<'_> {
     #[inline]
     fn drop(&mut self) {
-        if self.1.is_owned() {
-            self.synchronize();
-            driver!(cuStreamDestroy_v2(self.0));
-        }
+        self.synchronize();
+        driver!(cuStreamDestroy_v2(self.0.res));
     }
 }
 
@@ -32,56 +24,21 @@ impl AsRaw for Stream<'_> {
     type Raw = cuda::CUstream;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0
-    }
-}
-
-impl<'ctx> Stream<'ctx> {
-    #[inline]
-    pub const fn ctx(&self) -> &'ctx ContextGuard<'ctx> {
-        self.1.ctx()
+        self.0.res
     }
 }
 
 impl Stream<'_> {
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuStreamSynchronize(self.0));
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-#[repr(transparent)]
-pub struct StreamSpore(cuda::CUstream);
-
-spore_convention!(StreamSpore);
-
-impl ContextSpore for StreamSpore {
-    type Resource<'ctx> = Stream<'ctx>;
-
-    #[inline]
-    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
-        Stream(self.0, not_owned(ctx))
+        driver!(cuStreamSynchronize(self.0.res));
     }
 
     #[inline]
-    unsafe fn kill(&mut self, ctx: &ContextGuard) {
-        drop(Stream(replace(&mut self.0, null_mut()), owned(ctx)));
-    }
-
-    #[inline]
-    fn is_alive(&self) -> bool {
-        !self.0.is_null()
-    }
-}
-
-impl<'ctx> ContextResource<'ctx> for Stream<'ctx> {
-    type Spore = StreamSpore;
-
-    #[inline]
-    fn sporulate(self) -> Self::Spore {
-        let s = self.0;
-        forget(self);
-        StreamSpore(s)
+    pub unsafe fn wrap_resource<T>(&self, res: T) -> ResourceWrapper<T> {
+        ResourceWrapper {
+            ctx: self.0.ctx,
+            res,
+        }
     }
 }

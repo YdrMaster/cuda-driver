@@ -1,10 +1,8 @@
-﻿use crate::{
-    bindings as cuda, context::ResourceOwnership, not_owned, owned, spore_convention, AsRaw,
-    ContextGuard, ContextResource, ContextSpore, Stream,
-};
+﻿use crate::{bindings as cuda, impl_spore, AsRaw, Blob, ContextGuard, Stream};
 use std::{
     alloc::Layout,
-    mem::{forget, size_of_val, take},
+    marker::PhantomData,
+    mem::{forget, size_of_val},
     ops::{Deref, DerefMut},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
@@ -62,22 +60,17 @@ impl Stream<'_> {
     }
 }
 
-pub struct DevMem<'ctx> {
-    ptr: cuda::CUdeviceptr,
-    len: usize,
-    ownership: ResourceOwnership<'ctx>,
-}
+impl_spore!(DevMem and DevMemSpore by Blob<cuda::CUdeviceptr>);
 
 impl ContextGuard<'_> {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'_> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;
         driver!(cuMemAlloc_v2(&mut ptr, len));
-        DevMem {
-            ptr,
-            len,
-            ownership: owned(self),
-        }
+        DevMem(
+            unsafe { self.wrap_resource(Blob { ptr, len }) },
+            PhantomData,
+        )
     }
 
     pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'_> {
@@ -86,11 +79,10 @@ impl ContextGuard<'_> {
         let mut ptr = 0;
         driver!(cuMemAlloc_v2(&mut ptr, len));
         driver!(cuMemcpyHtoD_v2(ptr, src, len));
-        DevMem {
-            ptr,
-            len,
-            ownership: owned(self),
-        }
+        DevMem(
+            unsafe { self.wrap_resource(Blob { ptr, len }) },
+            PhantomData,
+        )
     }
 }
 
@@ -99,11 +91,10 @@ impl<'ctx> Stream<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, self.as_raw()));
-        DevMem {
-            ptr,
-            len,
-            ownership: owned(self.ctx()),
-        }
+        DevMem(
+            unsafe { self.wrap_resource(Blob { ptr, len }) },
+            PhantomData,
+        )
     }
 
     pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'ctx> {
@@ -113,30 +104,25 @@ impl<'ctx> Stream<'ctx> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, stream));
         driver!(cuMemcpyHtoDAsync_v2(ptr, src, len, stream));
-        DevMem {
-            ptr,
-            len,
-            ownership: owned(self.ctx()),
-        }
+        DevMem(
+            unsafe { self.wrap_resource(Blob { ptr, len }) },
+            PhantomData,
+        )
     }
 }
 
 impl DevMem<'_> {
     #[inline]
     pub fn drop_on(self, stream: &Stream) {
-        if self.ownership.is_owned() {
-            driver!(cuMemFreeAsync(self.ptr, stream.as_raw()));
-            forget(self);
-        }
+        driver!(cuMemFreeAsync(self.0.res.ptr, stream.as_raw()));
+        forget(self);
     }
 }
 
 impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        if self.ownership.is_owned() {
-            driver!(cuMemFree_v2(self.ptr));
-        }
+        driver!(cuMemFree_v2(self.0.res.ptr));
     }
 }
 
@@ -144,10 +130,10 @@ impl Deref for DevMem<'_> {
     type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        if self.len == 0 {
+        if self.0.res.len == 0 {
             &[]
         } else {
-            unsafe { from_raw_parts(self.ptr as _, self.len) }
+            unsafe { from_raw_parts(self.0.res.ptr as _, self.0.res.len) }
         }
     }
 }
@@ -155,69 +141,10 @@ impl Deref for DevMem<'_> {
 impl DerefMut for DevMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        if self.len == 0 {
+        if self.0.res.len == 0 {
             &mut []
         } else {
-            unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
+            unsafe { from_raw_parts_mut(self.0.res.ptr as _, self.0.res.len) }
         }
-    }
-}
-
-#[derive(PartialEq, Eq, Debug)]
-pub struct DevMemSpore {
-    ptr: cuda::CUdeviceptr,
-    len: usize,
-}
-
-spore_convention!(DevMemSpore);
-
-impl DevMemSpore {
-    /// # Safety
-    ///
-    /// This function must be called in the same context as the one that created the resource.
-    #[inline]
-    pub unsafe fn kill_on(&mut self, stream: &Stream) {
-        driver!(cuMemFreeAsync(take(&mut self.ptr), stream.as_raw()));
-    }
-}
-
-impl ContextSpore for DevMemSpore {
-    type Resource<'ctx> = DevMem<'ctx>;
-
-    #[inline]
-    unsafe fn sprout<'ctx>(&self, ctx: &'ctx ContextGuard) -> Self::Resource<'ctx> {
-        DevMem {
-            ptr: self.ptr,
-            len: self.len,
-            ownership: not_owned(ctx),
-        }
-    }
-
-    #[inline]
-    unsafe fn kill(&mut self, ctx: &ContextGuard) {
-        drop(DevMem {
-            ptr: take(&mut self.ptr),
-            len: self.len,
-            ownership: owned(ctx),
-        });
-    }
-
-    #[inline]
-    fn is_alive(&self) -> bool {
-        self.ptr != cuda::CUdeviceptr::default()
-    }
-}
-
-impl<'ctx> ContextResource<'ctx> for DevMem<'ctx> {
-    type Spore = DevMemSpore;
-
-    #[inline]
-    fn sporulate(self) -> Self::Spore {
-        let ans = DevMemSpore {
-            ptr: self.ptr,
-            len: self.len,
-        };
-        forget(self);
-        ans
     }
 }
