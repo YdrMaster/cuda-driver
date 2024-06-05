@@ -11,7 +11,7 @@ impl<'ctx> Stream<'ctx> {
             CUstream_flags::CU_STREAM_DEFAULT as _
         ));
         driver!(cuEventRecord(event, self.as_raw()));
-        Event(unsafe { self.wrap_resource(event) }, PhantomData)
+        Event(unsafe { self.ctx().wrap_resource(event) }, PhantomData)
     }
 }
 

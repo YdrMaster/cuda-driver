@@ -92,7 +92,7 @@ impl<'ctx> Stream<'ctx> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, self.as_raw()));
         DevMem(
-            unsafe { self.wrap_resource(Blob { ptr, len }) },
+            unsafe { self.ctx().wrap_resource(Blob { ptr, len }) },
             PhantomData,
         )
     }
@@ -105,7 +105,7 @@ impl<'ctx> Stream<'ctx> {
         driver!(cuMemAllocAsync(&mut ptr, len, stream));
         driver!(cuMemcpyHtoDAsync_v2(ptr, src, len, stream));
         DevMem(
-            unsafe { self.wrap_resource(Blob { ptr, len }) },
+            unsafe { self.ctx().wrap_resource(Blob { ptr, len }) },
             PhantomData,
         )
     }

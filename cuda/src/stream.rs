@@ -1,4 +1,4 @@
-﻿use crate::{bindings as cuda, impl_spore, AsRaw, ContextGuard, ResourceWrapper};
+﻿use crate::{bindings as cuda, impl_spore, AsRaw, ContextGuard};
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Stream and StreamSpore by cuda::CUstream);
@@ -33,12 +33,11 @@ impl Stream<'_> {
     pub fn synchronize(&self) {
         driver!(cuStreamSynchronize(self.0.res));
     }
+}
 
+impl<'ctx> Stream<'ctx> {
     #[inline]
-    pub unsafe fn wrap_resource<T>(&self, res: T) -> ResourceWrapper<T> {
-        ResourceWrapper {
-            ctx: self.0.ctx,
-            res,
-        }
+    pub fn ctx(&self) -> &ContextGuard<'ctx> {
+        unsafe { std::mem::transmute(&self.0.ctx) }
     }
 }

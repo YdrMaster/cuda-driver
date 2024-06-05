@@ -1,5 +1,5 @@
 ﻿use crate::{bindings as cuda, AsRaw, Device, ResourceWrapper};
-use std::ptr::null_mut;
+use std::{marker::PhantomData, ptr::null_mut};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Context {
@@ -73,13 +73,13 @@ impl Context {
 }
 
 #[repr(transparent)]
-pub struct ContextGuard<'a>(&'a Context);
+pub struct ContextGuard<'a>(cuda::CUcontext, PhantomData<&'a ()>);
 
 impl Context {
     #[inline]
     fn push(&self) -> ContextGuard {
         driver!(cuCtxPushCurrent_v2(self.ctx));
-        ContextGuard(self)
+        ContextGuard(self.ctx, PhantomData)
     }
 }
 
@@ -88,7 +88,7 @@ impl Drop for ContextGuard<'_> {
     fn drop(&mut self) {
         let mut top = null_mut();
         driver!(cuCtxPopCurrent_v2(&mut top));
-        assert_eq!(top, self.0.ctx)
+        assert_eq!(top, self.0)
     }
 }
 
@@ -96,14 +96,16 @@ impl AsRaw for ContextGuard<'_> {
     type Raw = cuda::CUcontext;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.ctx
+        self.0
     }
 }
 
 impl ContextGuard<'_> {
     #[inline]
     pub fn dev(&self) -> Device {
-        Device::new(self.0.dev)
+        let mut dev = 0;
+        driver!(cuCtxGetDevice(&mut dev));
+        Device::new(dev)
     }
 
     /// 将一段 host 存储空间注册为锁页内存，以允许从这个上下文直接访问。
@@ -128,10 +130,7 @@ impl ContextGuard<'_> {
 
     #[inline]
     pub unsafe fn wrap_resource<T>(&self, res: T) -> ResourceWrapper<T> {
-        ResourceWrapper {
-            ctx: self.0.ctx,
-            res,
-        }
+        ResourceWrapper { ctx: self.0, res }
     }
 }
 
