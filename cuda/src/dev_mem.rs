@@ -148,3 +148,23 @@ impl DerefMut for DevMem<'_> {
         }
     }
 }
+
+impl AsRaw for DevMemSpore {
+    type Raw = cuda::CUdeviceptr;
+    #[inline]
+    unsafe fn as_raw(&self) -> Self::Raw {
+        self.0.res.ptr
+    }
+}
+
+impl DevMemSpore {
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.0.res.len
+    }
+
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.0.res.len == 0
+    }
+}
