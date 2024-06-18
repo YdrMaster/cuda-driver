@@ -8,7 +8,7 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 static_assertions = "1.1"
-half_ = { version = "2.4", package = "half", optional = true }
+half_ = { workspace = true, optional = true }
 log = "0.4"
 
 [build-dependencies]

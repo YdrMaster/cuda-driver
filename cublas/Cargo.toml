@@ -8,8 +8,16 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 cuda = { path = "../cuda" }
+half_ = { workspace = true, optional = true }
 
 [build-dependencies]
 bindgen.workspace = true
 build-script-cfg.workspace = true
 search-cuda-tools = { path = "../search-cuda-tools" }
+
+[features]
+default = ["half"]
+half = ["half_"]
+
+[dev-dependencies]
+rand = "0.8"

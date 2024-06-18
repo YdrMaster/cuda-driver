@@ -1,4 +1,4 @@
-#![deny(warnings)]
+// #![deny(warnings)]
 #![cfg(detected_cuda)]
 
 #[macro_use]
@@ -22,4 +22,7 @@ mod cublas;
 mod cublaslt;
 
 pub use cublas::{Cublas, CublasSpore};
-pub use cublaslt::{CublasLt, CublasLtSpore};
+pub use cublaslt::{
+    CublasLt, CublasLtMatMulDescriptor, CublasLtMatrix, CublasLtMatrixLayout, CublasLtSpore,
+    MatrixOrder,
+};
