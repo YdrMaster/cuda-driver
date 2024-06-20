@@ -1,21 +1,21 @@
-﻿use crate::bindings as cublas;
-use cuda::{impl_spore, AsRaw, ContextGuard};
+﻿use crate::bindings::cublasHandle_t;
+use cuda::{impl_spore, AsRaw, ContextGuard, Stream};
 use std::{marker::PhantomData, ptr::null_mut};
 
-impl_spore!(Cublas and CublasSpore by cublas::cublasHandle_t);
+impl_spore!(Cublas and CublasSpore by cublasHandle_t);
 
 impl Drop for Cublas<'_> {
     #[inline]
     fn drop(&mut self) {
-        cublas!(cublas::cublasDestroy_v2(self.0.res));
+        cublas!(cublasDestroy_v2(self.0.raw));
     }
 }
 
 impl AsRaw for Cublas<'_> {
-    type Raw = cublas::cublasHandle_t;
+    type Raw = cublasHandle_t;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.res
+        self.0.raw
     }
 }
 
@@ -23,15 +23,19 @@ impl<'ctx> Cublas<'ctx> {
     #[inline]
     pub fn new(ctx: &'ctx ContextGuard) -> Self {
         let mut handle = null_mut();
-        cublas!(cublas::cublasCreate_v2(&mut handle));
-        Self(unsafe { ctx.wrap_resource(handle) }, PhantomData)
+        cublas!(cublasCreate_v2(&mut handle));
+        Self(unsafe { ctx.wrap_raw(handle) }, PhantomData)
     }
 
     #[inline]
-    pub fn set_stream(&self, stream: &cuda::Stream) {
-        cublas!(cublas::cublasSetStream_v2(
-            self.0.res,
-            stream.as_raw().cast()
-        ));
+    pub fn bind(stream: &'ctx Stream) -> Self {
+        let mut ans = Self::new(stream.ctx());
+        ans.set_stream(stream);
+        ans
+    }
+
+    #[inline]
+    pub fn set_stream(&mut self, stream: &Stream) {
+        cublas!(cublasSetStream_v2(self.0.raw, stream.as_raw().cast()));
     }
 }

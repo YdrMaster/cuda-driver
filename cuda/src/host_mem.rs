@@ -15,17 +15,14 @@ impl<'ctx> ContextGuard<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = null_mut();
         driver!(cuMemHostAlloc(&mut ptr, len, 0));
-        HostMem(
-            unsafe { self.wrap_resource(Blob { ptr, len }) },
-            PhantomData,
-        )
+        HostMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 }
 
 impl Drop for HostMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuMemFreeHost(self.0.res.ptr));
+        driver!(cuMemFreeHost(self.0.raw.ptr));
     }
 }
 
@@ -33,7 +30,7 @@ impl AsRaw for HostMem<'_> {
     type Raw = *mut c_void;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.res.ptr
+        self.0.raw.ptr
     }
 }
 
@@ -42,14 +39,14 @@ impl Deref for HostMem<'_> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.0.res.ptr.cast(), self.0.res.len) }
+        unsafe { from_raw_parts(self.0.raw.ptr.cast(), self.0.raw.len) }
     }
 }
 
 impl DerefMut for HostMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { from_raw_parts_mut(self.0.res.ptr.cast(), self.0.res.len) }
+        unsafe { from_raw_parts_mut(self.0.raw.ptr.cast(), self.0.raw.len) }
     }
 }
 
@@ -58,14 +55,14 @@ impl Deref for HostMemSpore {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.0.res.ptr.cast(), self.0.res.len) }
+        unsafe { from_raw_parts(self.0.raw.ptr.cast(), self.0.raw.len) }
     }
 }
 
 impl DerefMut for HostMemSpore {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { from_raw_parts_mut(self.0.res.ptr.cast(), self.0.res.len) }
+        unsafe { from_raw_parts_mut(self.0.raw.ptr.cast(), self.0.raw.len) }
     }
 }
 

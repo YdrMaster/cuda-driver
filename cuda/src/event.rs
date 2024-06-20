@@ -11,14 +11,14 @@ impl<'ctx> Stream<'ctx> {
             CUstream_flags::CU_STREAM_DEFAULT as _
         ));
         driver!(cuEventRecord(event, self.as_raw()));
-        Event(unsafe { self.ctx().wrap_resource(event) }, PhantomData)
+        Event(unsafe { self.ctx().wrap_raw(event) }, PhantomData)
     }
 }
 
 impl Drop for Event<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuEventDestroy_v2(self.0.res));
+        driver!(cuEventDestroy_v2(self.0.raw));
     }
 }
 
@@ -26,14 +26,14 @@ impl AsRaw for Event<'_> {
     type Raw = cuda::CUevent;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.res
+        self.0.raw
     }
 }
 
 impl Stream<'_> {
     #[inline]
     pub fn wait_for(&self, event: &Event) {
-        driver!(cuStreamWaitEvent(self.as_raw(), event.0.res, 0));
+        driver!(cuStreamWaitEvent(self.as_raw(), event.0.raw, 0));
     }
 
     pub fn bench(&self, mut f: impl FnMut(usize, &Self), times: usize, warm_up: usize) -> Duration {
@@ -53,13 +53,13 @@ impl Stream<'_> {
 impl Event<'_> {
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuEventSynchronize(self.0.res));
+        driver!(cuEventSynchronize(self.0.raw));
     }
 
     #[inline]
     pub fn elapse_from(&self, start: &Self) -> Duration {
         let mut ms = 0.0;
-        driver!(cuEventElapsedTime(&mut ms, start.0.res, self.0.res));
+        driver!(cuEventElapsedTime(&mut ms, start.0.raw, self.0.raw));
         Duration::from_secs_f32(ms * 1e-3)
     }
 }

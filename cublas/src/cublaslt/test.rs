@@ -35,8 +35,7 @@ fn general() {
         let dev_b = rand_blob(K * N, &stream);
         let mut dev_c = stream.malloc::<f32>(M * N);
 
-        let cublas = Cublas::new(ctx);
-        cublas.set_stream(&stream);
+        let cublas = Cublas::bind(&stream);
 
         cublas!(cublasGemmEx(
             cublas.as_raw(),
@@ -145,8 +144,7 @@ fn bench() {
             let dev_b = rand_blob(k * n, &stream);
             let mut dev_c = stream.malloc::<f32>(m * n);
 
-            let cublas = Cublas::new(ctx);
-            cublas.set_stream(&stream);
+            let cublas = Cublas::bind(&stream);
 
             let mut f = || {
                 cublas!(cublasGemmEx(

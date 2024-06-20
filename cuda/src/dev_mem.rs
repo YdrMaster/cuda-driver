@@ -67,10 +67,7 @@ impl ContextGuard<'_> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;
         driver!(cuMemAlloc_v2(&mut ptr, len));
-        DevMem(
-            unsafe { self.wrap_resource(Blob { ptr, len }) },
-            PhantomData,
-        )
+        DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 
     pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'_> {
@@ -79,10 +76,7 @@ impl ContextGuard<'_> {
         let mut ptr = 0;
         driver!(cuMemAlloc_v2(&mut ptr, len));
         driver!(cuMemcpyHtoD_v2(ptr, src, len));
-        DevMem(
-            unsafe { self.wrap_resource(Blob { ptr, len }) },
-            PhantomData,
-        )
+        DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 }
 
@@ -92,7 +86,7 @@ impl<'ctx> Stream<'ctx> {
         let mut ptr = 0;
         driver!(cuMemAllocAsync(&mut ptr, len, self.as_raw()));
         DevMem(
-            unsafe { self.ctx().wrap_resource(Blob { ptr, len }) },
+            unsafe { self.ctx().wrap_raw(Blob { ptr, len }) },
             PhantomData,
         )
     }
@@ -105,7 +99,7 @@ impl<'ctx> Stream<'ctx> {
         driver!(cuMemAllocAsync(&mut ptr, len, stream));
         driver!(cuMemcpyHtoDAsync_v2(ptr, src, len, stream));
         DevMem(
-            unsafe { self.ctx().wrap_resource(Blob { ptr, len }) },
+            unsafe { self.ctx().wrap_raw(Blob { ptr, len }) },
             PhantomData,
         )
     }
@@ -114,7 +108,7 @@ impl<'ctx> Stream<'ctx> {
 impl DevMem<'_> {
     #[inline]
     pub fn drop_on(self, stream: &Stream) {
-        driver!(cuMemFreeAsync(self.0.res.ptr, stream.as_raw()));
+        driver!(cuMemFreeAsync(self.0.raw.ptr, stream.as_raw()));
         forget(self);
     }
 }
@@ -122,7 +116,7 @@ impl DevMem<'_> {
 impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuMemFree_v2(self.0.res.ptr));
+        driver!(cuMemFree_v2(self.0.raw.ptr));
     }
 }
 
@@ -130,10 +124,10 @@ impl Deref for DevMem<'_> {
     type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        if self.0.res.len == 0 {
+        if self.0.raw.len == 0 {
             &[]
         } else {
-            unsafe { from_raw_parts(self.0.res.ptr as _, self.0.res.len) }
+            unsafe { from_raw_parts(self.0.raw.ptr as _, self.0.raw.len) }
         }
     }
 }
@@ -141,10 +135,10 @@ impl Deref for DevMem<'_> {
 impl DerefMut for DevMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        if self.0.res.len == 0 {
+        if self.0.raw.len == 0 {
             &mut []
         } else {
-            unsafe { from_raw_parts_mut(self.0.res.ptr as _, self.0.res.len) }
+            unsafe { from_raw_parts_mut(self.0.raw.ptr as _, self.0.raw.len) }
         }
     }
 }
@@ -153,18 +147,18 @@ impl AsRaw for DevMemSpore {
     type Raw = cuda::CUdeviceptr;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.res.ptr
+        self.0.raw.ptr
     }
 }
 
 impl DevMemSpore {
     #[inline]
     pub const fn len(&self) -> usize {
-        self.0.res.len
+        self.0.raw.len
     }
 
     #[inline]
     pub const fn is_empty(&self) -> bool {
-        self.0.res.len == 0
+        self.0.raw.len == 0
     }
 }

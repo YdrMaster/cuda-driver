@@ -9,14 +9,14 @@ impl ContextGuard<'_> {
     pub fn load<'ctx>(&'ctx self, ptx: &Ptx) -> Module<'ctx> {
         let mut module = null_mut();
         driver!(cuModuleLoadData(&mut module, ptx.as_ptr().cast()));
-        Module(unsafe { self.wrap_resource(module) }, PhantomData)
+        Module(unsafe { self.wrap_raw(module) }, PhantomData)
     }
 }
 
 impl Drop for Module<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuModuleUnload(self.0.res));
+        driver!(cuModuleUnload(self.0.raw));
     }
 }
 
@@ -24,6 +24,6 @@ impl AsRaw for Module<'_> {
     type Raw = cuda::CUmodule;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.res
+        self.0.raw
     }
 }

@@ -1,4 +1,4 @@
-﻿use crate::{bindings as cuda, AsRaw, Device, ResourceWrapper};
+﻿use crate::{bindings as cuda, AsRaw, Device, RawContainer};
 use std::{marker::PhantomData, ptr::null_mut};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -128,9 +128,14 @@ impl ContextGuard<'_> {
         driver!(cuCtxSynchronize());
     }
 
+    /// Wrap a raw object in a `RawContainer`.
+    ///
+    /// # Safety
+    ///
+    /// The raw object must be created in this [`Context`].
     #[inline]
-    pub unsafe fn wrap_resource<T>(&self, res: T) -> ResourceWrapper<T> {
-        ResourceWrapper { ctx: self.0, res }
+    pub unsafe fn wrap_raw<T>(&self, raw: T) -> RawContainer<T> {
+        RawContainer { ctx: self.0, raw }
     }
 }
 

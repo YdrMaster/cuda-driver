@@ -13,7 +13,7 @@ impl_spore!(CublasLt and CublasLtSpore by cublasLtHandle_t);
 impl Drop for CublasLt<'_> {
     #[inline]
     fn drop(&mut self) {
-        cublas!(cublasLtDestroy(self.0.res));
+        cublas!(cublasLtDestroy(self.0.raw));
     }
 }
 
@@ -21,7 +21,7 @@ impl AsRaw for CublasLt<'_> {
     type Raw = cublasLtHandle_t;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.res
+        self.0.raw
     }
 }
 
@@ -39,7 +39,7 @@ impl<'ctx> CublasLt<'ctx> {
     pub fn new(ctx: &'ctx ContextGuard) -> Self {
         let mut handle = null_mut();
         cublas!(cublasLtCreate(&mut handle));
-        Self(unsafe { ctx.wrap_resource(handle) }, PhantomData)
+        Self(unsafe { ctx.wrap_raw(handle) }, PhantomData)
     }
 
     pub fn tune(
@@ -60,11 +60,14 @@ impl<'ctx> CublasLt<'ctx> {
         ));
 
         let mut result = Vec::with_capacity(request_count);
-        unsafe { result.set_len(request_count) };
+        #[allow(clippy::uninit_vec)]
+        unsafe {
+            result.set_len(request_count);
+        }
 
         let mut ans_n = 0;
         cublas!(cublasLtMatmulAlgoGetHeuristic(
-            self.0.res,
+            self.0.raw,
             layout.mat_mul.as_raw(),
             layout.a.as_raw(),
             layout.b.as_raw(),
@@ -106,13 +109,13 @@ impl<'ctx> CublasLt<'ctx> {
             layout.mat_mul.as_raw(),
             cublasLtMatmulDescAttributes_t::CUBLASLT_MATMUL_DESC_SCALE_TYPE,
             &mut dt as *mut _ as _,
-            size_of_val(&mut dt),
+            size_of_val(&dt),
             &mut written,
         ));
-        assert_eq!(written, size_of_val(&mut dt));
+        assert_eq!(written, size_of_val(&dt));
 
         cublas!(cublasLtMatmul(
-            self.0.res,
+            self.0.raw,
             layout.mat_mul.as_raw(),
             FloatScalar::convert(alpha, dt).as_ptr(),
             a_ptr.cast(),

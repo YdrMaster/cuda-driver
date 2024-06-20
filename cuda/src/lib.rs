@@ -61,7 +61,7 @@ pub use device::{ComputeCapability, Device};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
-pub use spore::{ContextResource, ContextSpore, ResourceWrapper};
+pub use spore::{ContextResource, ContextSpore, RawContainer};
 pub use stream::{Stream, StreamSpore};
 
 use std::ffi::c_uint;

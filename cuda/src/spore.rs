@@ -28,21 +28,21 @@ macro_rules! spore_convention {
     };
 }
 
-pub struct ResourceWrapper<T> {
+pub struct RawContainer<T> {
     pub ctx: cuda::CUcontext,
-    pub res: T,
+    pub raw: T,
 }
 
 #[macro_export]
 macro_rules! impl_spore {
     ($resource:ident and $spore:ident by $kernel:ty) => {
         pub struct $resource<'ctx>(
-            $crate::ResourceWrapper<$kernel>,
+            $crate::RawContainer<$kernel>,
             std::marker::PhantomData<&'ctx ()>,
         );
 
         #[repr(transparent)]
-        pub struct $spore($crate::ResourceWrapper<$kernel>);
+        pub struct $spore($crate::RawContainer<$kernel>);
 
         $crate::spore_convention!($spore);
 
