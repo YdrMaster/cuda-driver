@@ -1,11 +1,17 @@
-﻿use crate::{bindings as cuda, AsRaw, Dim3};
+﻿use crate::{
+    bindings::{
+        CUdevice,
+        CUdevice_attribute::{self, *},
+    },
+    AsRaw, Dim3,
+};
 use std::{cmp::Ordering, ffi::c_int, fmt, ptr::null_mut};
 
 #[repr(transparent)]
-pub struct Device(cuda::CUdevice);
+pub struct Device(CUdevice);
 
 impl AsRaw for Device {
-    type Raw = cuda::CUdevice;
+    type Raw = CUdevice;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -38,10 +44,10 @@ impl Device {
 
     #[inline]
     pub fn compute_capability(&self) -> ComputeCapability {
-        let mut major = 0;
-        let mut minor = 0;
-        driver!(cuDeviceComputeCapability(&mut major, &mut minor, self.0));
-        ComputeCapability { major, minor }
+        ComputeCapability {
+            major: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR),
+            minor: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR),
+        }
     }
 
     #[inline]
@@ -53,12 +59,15 @@ impl Device {
 
     #[inline]
     pub fn alignment(&self) -> usize {
-        self.get_attribute(cuda::CUdevice_attribute_enum::CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT)
-            as _
+        self.get_attribute(CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT) as _
+    }
+
+    #[inline]
+    pub fn warp_size(&self) -> usize {
+        self.get_attribute(CU_DEVICE_ATTRIBUTE_WARP_SIZE) as _
     }
 
     pub fn max_block_dims(&self) -> (usize, Dim3) {
-        use cuda::CUdevice_attribute::*;
         (
             self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK) as _,
             Dim3 {
@@ -80,7 +89,7 @@ impl Device {
     }
 
     #[inline]
-    fn get_attribute(&self, attr: cuda::CUdevice_attribute) -> i32 {
+    fn get_attribute(&self, attr: CUdevice_attribute) -> i32 {
         let mut value = 0;
         driver!(cuDeviceGetAttribute(&mut value, attr, self.0));
         value
