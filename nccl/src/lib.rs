@@ -30,20 +30,21 @@ pub use communicator::Communicator;
 pub use group::CommunicatorGroup;
 
 use bindings::ncclDataType_t;
-use cuda::CudaDataType;
+use digit_layout::DigitLayout;
 
 #[inline]
-fn convert(data_type: CudaDataType) -> ncclDataType_t {
+fn convert(data_type: DigitLayout) -> ncclDataType_t {
+    use digit_layout::types::*;
     match data_type {
-        CudaDataType::i8 => ncclDataType_t::ncclInt8,
-        CudaDataType::u8 => ncclDataType_t::ncclUint8,
-        CudaDataType::i32 => ncclDataType_t::ncclInt32,
-        CudaDataType::u32 => ncclDataType_t::ncclUint32,
-        CudaDataType::i64 => ncclDataType_t::ncclInt64,
-        CudaDataType::u64 => ncclDataType_t::ncclUint64,
-        CudaDataType::f16 => ncclDataType_t::ncclHalf,
-        CudaDataType::f32 => ncclDataType_t::ncclFloat,
-        CudaDataType::f64 => ncclDataType_t::ncclDouble,
-        dt => panic!("\"{}\" is not supported by NCCL", dt.name()),
+        I8 => ncclDataType_t::ncclInt8,
+        U8 => ncclDataType_t::ncclUint8,
+        I32 => ncclDataType_t::ncclInt32,
+        U32 => ncclDataType_t::ncclUint32,
+        I64 => ncclDataType_t::ncclInt64,
+        U64 => ncclDataType_t::ncclUint64,
+        F16 => ncclDataType_t::ncclHalf,
+        F32 => ncclDataType_t::ncclFloat,
+        F64 => ncclDataType_t::ncclDouble,
+        _ => panic!("Digit layout is not supported by NCCL"),
     }
 }

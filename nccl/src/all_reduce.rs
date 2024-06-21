@@ -1,12 +1,13 @@
 ﻿use crate::{convert, Communicator, ReduceType};
-use cuda::{AsRaw, CudaDataType, DevByte, Stream};
+use cuda::{AsRaw, DevByte, Stream};
+use digit_layout::DigitLayout;
 
 impl Communicator {
     pub fn all_reduce(
         &self,
         dst: &mut [DevByte],
         src: Option<&[DevByte]>,
-        dt: CudaDataType,
+        dt: DigitLayout,
         op: ReduceType,
         stream: &Stream,
     ) {
@@ -20,7 +21,7 @@ impl Communicator {
                 recvbuff
             },
             recvbuff,
-            size / dt.size(),
+            size / dt.nbytes(),
             convert(dt),
             op,
             self.as_raw(),
@@ -32,6 +33,7 @@ impl Communicator {
 #[test]
 fn test() {
     use cuda::{ContextResource, ContextSpore};
+    use digit_layout::types::F32;
     use std::iter::zip;
 
     const N: usize = 12 << 10; // 10K * sizeof::<f32>() = 40K bytes
@@ -57,13 +59,7 @@ fn test() {
                 // let mut mem = stream.malloc::<f32>(N); // stream ordered memory allocation is not allowed in NCCL
 
                 stream.memcpy_h2d(&mut mem, &array);
-                comm.all_reduce(
-                    &mut mem,
-                    None,
-                    CudaDataType::f32,
-                    ReduceType::ncclSum,
-                    &stream,
-                );
+                comm.all_reduce(&mut mem, None, F32, ReduceType::ncclSum, &stream);
                 mem.sporulate()
             })
         })

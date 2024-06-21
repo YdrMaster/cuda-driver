@@ -32,7 +32,6 @@ pub mod bindings {
 }
 
 mod context;
-mod data_type;
 mod dev_mem;
 mod device;
 mod event;
@@ -55,7 +54,6 @@ pub fn init() {
 }
 
 pub use context::{Context, ContextGuard};
-pub use data_type::{CuTy, CudaDataType};
 pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
 pub use device::{ComputeCapability, Device};
 pub use event::{Event, EventSpore};
