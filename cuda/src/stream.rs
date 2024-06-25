@@ -1,9 +1,9 @@
-﻿use crate::{bindings::CUstream, impl_spore, AsRaw, ContextGuard};
+﻿use crate::{bindings::CUstream, impl_spore, AsRaw, CurrentCtx};
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Stream and StreamSpore by CUstream);
 
-impl ContextGuard<'_> {
+impl CurrentCtx {
     #[inline]
     pub fn stream(&self) -> Stream {
         let mut stream = null_mut();
@@ -32,12 +32,5 @@ impl Stream<'_> {
     #[inline]
     pub fn synchronize(&self) {
         driver!(cuStreamSynchronize(self.0.raw));
-    }
-}
-
-impl<'ctx> Stream<'ctx> {
-    #[inline]
-    pub fn ctx(&self) -> &ContextGuard<'ctx> {
-        unsafe { std::mem::transmute(&self.0.ctx) }
     }
 }

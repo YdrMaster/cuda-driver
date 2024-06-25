@@ -2,7 +2,7 @@
 mod multiply;
 
 use crate::bindings::{cublasLtHandle_t, cublasLtMatmulAlgo_t, cudaDataType};
-use cuda::{impl_spore, AsRaw, ContextGuard, DevByte, Stream};
+use cuda::{impl_spore, AsRaw, CurrentCtx, DevByte, Stream};
 use std::{ffi::c_void, marker::PhantomData, mem::size_of_val, ptr::null_mut};
 
 pub use matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
@@ -34,9 +34,9 @@ pub struct CublasLtMatMulLayout<'a> {
     d: &'a CublasLtMatrix,
 }
 
-impl<'ctx> CublasLt<'ctx> {
+impl CublasLt<'_> {
     #[inline]
-    pub fn new(ctx: &'ctx ContextGuard) -> Self {
+    pub fn new(ctx: &CurrentCtx) -> Self {
         let mut handle = null_mut();
         cublas!(cublasLtCreate(&mut handle));
         Self(unsafe { ctx.wrap_raw(handle) }, PhantomData)

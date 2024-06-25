@@ -1,4 +1,4 @@
-﻿use crate::{impl_spore, AsRaw, Blob, ContextGuard};
+﻿use crate::{impl_spore, AsRaw, Blob, CurrentCtx};
 use std::{
     alloc::Layout,
     marker::PhantomData,
@@ -10,8 +10,8 @@ use std::{
 
 impl_spore!(HostMem and HostMemSpore by Blob<*mut c_void>);
 
-impl<'ctx> ContextGuard<'ctx> {
-    pub fn malloc_host<T: Copy>(&'ctx self, len: usize) -> HostMem<'ctx> {
+impl CurrentCtx {
+    pub fn malloc_host<T: Copy>(&self, len: usize) -> HostMem {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = null_mut();
         driver!(cuMemHostAlloc(&mut ptr, len, 0));

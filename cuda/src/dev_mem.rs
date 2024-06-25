@@ -1,4 +1,4 @@
-﻿use crate::{bindings::CUdeviceptr, impl_spore, AsRaw, Blob, ContextGuard, Stream};
+﻿use crate::{bindings::CUdeviceptr, impl_spore, AsRaw, Blob, CurrentCtx, Stream};
 use std::{
     alloc::Layout,
     marker::PhantomData,
@@ -62,7 +62,7 @@ impl Stream<'_> {
 
 impl_spore!(DevMem and DevMemSpore by Blob<CUdeviceptr>);
 
-impl ContextGuard<'_> {
+impl CurrentCtx {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'_> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;

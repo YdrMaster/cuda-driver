@@ -1,5 +1,5 @@
 ﻿use crate::bindings::cublasHandle_t;
-use cuda::{impl_spore, AsRaw, ContextGuard, Stream};
+use cuda::{impl_spore, AsRaw, CurrentCtx, Stream};
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Cublas and CublasSpore by cublasHandle_t);
@@ -19,16 +19,16 @@ impl AsRaw for Cublas<'_> {
     }
 }
 
-impl<'ctx> Cublas<'ctx> {
+impl Cublas<'_> {
     #[inline]
-    pub fn new(ctx: &'ctx ContextGuard) -> Self {
+    pub fn new(ctx: &CurrentCtx) -> Self {
         let mut handle = null_mut();
         cublas!(cublasCreate_v2(&mut handle));
         Self(unsafe { ctx.wrap_raw(handle) }, PhantomData)
     }
 
     #[inline]
-    pub fn bind(stream: &'ctx Stream) -> Self {
+    pub fn bind(stream: &Stream) -> Self {
         let mut ans = Self::new(stream.ctx());
         ans.set_stream(stream);
         ans

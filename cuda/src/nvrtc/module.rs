@@ -1,12 +1,12 @@
 ﻿use super::ptx::Ptx;
-use crate::{bindings::CUmodule, impl_spore, AsRaw, ContextGuard};
+use crate::{bindings::CUmodule, impl_spore, AsRaw, CurrentCtx};
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Module and ModuleSpore by CUmodule);
 
-impl ContextGuard<'_> {
+impl CurrentCtx {
     #[inline]
-    pub fn load<'ctx>(&'ctx self, ptx: &Ptx) -> Module<'ctx> {
+    pub fn load(&self, ptx: &Ptx) -> Module {
         let mut module = null_mut();
         driver!(cuModuleLoadData(&mut module, ptx.as_ptr().cast()));
         Module(unsafe { self.wrap_raw(module) }, PhantomData)
