@@ -136,7 +136,7 @@ fn bench() {
     println!("n = {n}");
     println!("k = {k}");
 
-    for m in 1..=1024 {
+    for m in 1..=128 {
         println!("m = {m} =========================");
         dev.context().apply(|ctx| {
             let stream = ctx.stream();
