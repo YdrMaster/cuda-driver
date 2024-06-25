@@ -1,19 +1,26 @@
-﻿use crate::{bindings as cuda, AsRaw, Device, RawContainer};
-use std::{marker::PhantomData, ptr::null_mut};
+﻿use crate::{
+    bindings::{CUcontext, CUdevice},
+    AsRaw, Device, RawContainer,
+};
+use std::{
+    marker::PhantomData,
+    mem::{align_of, size_of},
+    ptr::null_mut,
+};
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Context {
-    ctx: cuda::CUcontext,
-    dev: cuda::CUdevice,
+    ctx: CUcontext,
+    dev: CUdevice,
     primary: bool,
 }
-
-static_assertions::assert_eq_size!(Context, [usize; 2]);
-static_assertions::assert_eq_align!(Context, usize);
 
 impl Device {
     #[inline]
     pub fn context(&self) -> Context {
+        const { assert!(size_of::<Context>() == size_of::<[usize; 2]>()) }
+        const { assert!(align_of::<Context>() == align_of::<usize>()) }
+
         let dev = unsafe { self.as_raw() };
         let mut ctx = null_mut();
         driver!(cuCtxCreate_v2(&mut ctx, 0, dev));
@@ -53,7 +60,7 @@ unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
 impl AsRaw for Context {
-    type Raw = cuda::CUcontext;
+    type Raw = CUcontext;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.ctx
@@ -73,7 +80,10 @@ impl Context {
 }
 
 #[repr(transparent)]
-pub struct ContextGuard<'a>(cuda::CUcontext, PhantomData<&'a ()>);
+pub struct ContextGuard<'a>(CUcontext, PhantomData<&'a ()>);
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct NoCtxError;
 
 impl Context {
     #[inline]
@@ -93,7 +103,7 @@ impl Drop for ContextGuard<'_> {
 }
 
 impl AsRaw for ContextGuard<'_> {
-    type Raw = cuda::CUcontext;
+    type Raw = CUcontext;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -101,6 +111,18 @@ impl AsRaw for ContextGuard<'_> {
 }
 
 impl ContextGuard<'_> {
+    /// 如果存在当前上下文，在当前上下文上执行依赖上下文的操作。
+    #[inline]
+    pub fn apply_current<T>(f: impl FnOnce(&Self) -> T) -> Result<T, NoCtxError> {
+        let mut raw = null_mut();
+        driver!(cuCtxGetCurrent(&mut raw));
+        if !raw.is_null() {
+            Ok(f(&Self(raw, PhantomData)))
+        } else {
+            Err(NoCtxError)
+        }
+    }
+
     #[inline]
     pub fn dev(&self) -> Device {
         let mut dev = 0;

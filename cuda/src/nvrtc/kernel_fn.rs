@@ -1,10 +1,10 @@
-﻿use crate::{bindings as cuda, AsRaw, DevByte, Dim3, Module, Stream};
+﻿use crate::{bindings::CUfunction, AsRaw, DevByte, Dim3, Module, Stream};
 use std::{
     ffi::{c_void, CStr},
     ptr::null_mut,
 };
 
-pub struct KernelFn<'m>(cuda::CUfunction, #[allow(unused)] &'m Module<'m>);
+pub struct KernelFn<'m>(CUfunction, #[allow(unused)] &'m Module<'m>);
 
 impl<'m> Module<'m> {
     pub fn get_kernel(&'m self, name: impl AsRef<CStr>) -> KernelFn<'m> {

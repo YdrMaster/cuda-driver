@@ -1,4 +1,4 @@
-﻿use crate::{bindings as cuda, impl_spore, AsRaw, Blob, ContextGuard, Stream};
+﻿use crate::{bindings::CUdeviceptr, impl_spore, AsRaw, Blob, ContextGuard, Stream};
 use std::{
     alloc::Layout,
     marker::PhantomData,
@@ -60,7 +60,7 @@ impl Stream<'_> {
     }
 }
 
-impl_spore!(DevMem and DevMemSpore by Blob<cuda::CUdeviceptr>);
+impl_spore!(DevMem and DevMemSpore by Blob<CUdeviceptr>);
 
 impl ContextGuard<'_> {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'_> {
@@ -144,7 +144,7 @@ impl DerefMut for DevMem<'_> {
 }
 
 impl AsRaw for DevMemSpore {
-    type Raw = cuda::CUdeviceptr;
+    type Raw = CUdeviceptr;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.raw.ptr

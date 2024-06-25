@@ -1,7 +1,7 @@
-﻿use crate::{bindings as cuda, impl_spore, AsRaw, ContextGuard};
+﻿use crate::{bindings::CUstream, impl_spore, AsRaw, ContextGuard};
 use std::{marker::PhantomData, ptr::null_mut};
 
-impl_spore!(Stream and StreamSpore by cuda::CUstream);
+impl_spore!(Stream and StreamSpore by CUstream);
 
 impl ContextGuard<'_> {
     #[inline]
@@ -21,7 +21,7 @@ impl Drop for Stream<'_> {
 }
 
 impl AsRaw for Stream<'_> {
-    type Raw = cuda::CUstream;
+    type Raw = CUstream;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.raw

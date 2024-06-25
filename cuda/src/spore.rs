@@ -1,4 +1,4 @@
-﻿use crate::{bindings as cuda, ContextGuard};
+﻿use crate::{bindings::CUcontext, ContextGuard};
 
 pub trait ContextResource<'ctx> {
     type Spore: ContextSpore<Resource<'ctx> = Self>;
@@ -29,7 +29,7 @@ macro_rules! spore_convention {
 }
 
 pub struct RawContainer<T> {
-    pub ctx: cuda::CUcontext,
+    pub ctx: CUcontext,
     pub raw: T,
 }
 

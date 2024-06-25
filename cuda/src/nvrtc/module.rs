@@ -1,8 +1,8 @@
 ﻿use super::ptx::Ptx;
-use crate::{bindings as cuda, impl_spore, AsRaw, ContextGuard};
+use crate::{bindings::CUmodule, impl_spore, AsRaw, ContextGuard};
 use std::{marker::PhantomData, ptr::null_mut};
 
-impl_spore!(Module and ModuleSpore by cuda::CUmodule);
+impl_spore!(Module and ModuleSpore by CUmodule);
 
 impl ContextGuard<'_> {
     #[inline]
@@ -21,7 +21,7 @@ impl Drop for Module<'_> {
 }
 
 impl AsRaw for Module<'_> {
-    type Raw = cuda::CUmodule;
+    type Raw = CUmodule;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.raw

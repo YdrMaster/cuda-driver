@@ -1,7 +1,7 @@
-﻿use crate::{bindings as cuda, impl_spore, AsRaw, Stream};
+﻿use crate::{bindings::CUevent, impl_spore, AsRaw, Stream};
 use std::{marker::PhantomData, ptr::null_mut, time::Duration};
 
-impl_spore!(Event and EventSpore by cuda::CUevent);
+impl_spore!(Event and EventSpore by CUevent);
 
 impl<'ctx> Stream<'ctx> {
     pub fn record(&self) -> Event<'ctx> {
@@ -23,7 +23,7 @@ impl Drop for Event<'_> {
 }
 
 impl AsRaw for Event<'_> {
-    type Raw = cuda::CUevent;
+    type Raw = CUevent;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.raw

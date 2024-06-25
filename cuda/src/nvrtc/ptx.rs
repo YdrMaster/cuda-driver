@@ -1,4 +1,7 @@
-﻿use crate::{bindings as cuda, ComputeCapability};
+﻿use crate::{
+    bindings::{nvrtcCompileProgram, nvrtcResult},
+    ComputeCapability,
+};
 use core::fmt;
 use log::warn;
 use std::{
@@ -13,7 +16,7 @@ impl Ptx {
     pub fn compile(
         code: impl AsRef<str>,
         cc: ComputeCapability,
-    ) -> (Result<Self, cuda::nvrtcResult>, String) {
+    ) -> (Result<Self, nvrtcResult>, String) {
         let code = code.as_ref();
 
         let options = collect_options(code, cc);
@@ -50,8 +53,7 @@ impl Ptx {
             null(),
         ));
 
-        let result =
-            unsafe { cuda::nvrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
+        let result = unsafe { nvrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
         let log = {
             let mut log_len = 0;
             nvrtc!(nvrtcGetProgramLogSize(program, &mut log_len));
@@ -64,7 +66,7 @@ impl Ptx {
                 String::new()
             }
         };
-        let ans = if result == cuda::nvrtcResult::NVRTC_SUCCESS {
+        let ans = if result == nvrtcResult::NVRTC_SUCCESS {
             let mut ptx_len = 0;
             nvrtc!(nvrtcGetPTXSize(program, &mut ptx_len));
             let mut ptx = vec![0u8; ptx_len];
