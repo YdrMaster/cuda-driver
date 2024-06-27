@@ -55,21 +55,21 @@ pub fn init() {
 
 pub use context::{Context, CurrentCtx};
 pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
-pub use device::{ComputeCapability, Device};
+pub use device::{BlockLimit, ComputeCapability, Device, SMLimit};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use spore::{ContextResource, ContextSpore, RawContainer};
 pub use stream::{Stream, StreamSpore};
 
-use std::ffi::c_uint;
+use std::{ffi::c_uint, fmt};
 
 struct Blob<P> {
     ptr: P,
     len: usize,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Dim3 {
     pub x: c_uint,
     pub y: c_uint,
@@ -101,5 +101,40 @@ impl From<(c_uint, c_uint, c_uint)> for Dim3 {
     #[inline]
     fn from((z, y, x): (c_uint, c_uint, c_uint)) -> Self {
         Self { x, y, z }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(transparent)]
+pub struct MemSize(pub usize);
+
+impl fmt::Display for MemSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let zeros = self.0.trailing_zeros();
+        if zeros >= 40 {
+            write!(f, "{}TiB", self.0 >> 40)
+        } else if zeros >= 30 {
+            write!(f, "{}GiB", self.0 >> 30)
+        } else if zeros >= 20 {
+            write!(f, "{}MiB", self.0 >> 20)
+        } else if zeros >= 10 {
+            write!(f, "{}KiB", self.0 >> 10)
+        } else {
+            write!(f, "{}B", self.0)
+        }
+    }
+}
+
+impl From<i32> for MemSize {
+    #[inline]
+    fn from(value: i32) -> Self {
+        Self(value as _)
+    }
+}
+
+impl From<usize> for MemSize {
+    #[inline]
+    fn from(value: usize) -> Self {
+        Self(value)
     }
 }
