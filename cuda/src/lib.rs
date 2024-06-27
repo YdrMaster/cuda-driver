@@ -1,4 +1,5 @@
 #![cfg(detected_cuda)]
+#![deny(warnings)]
 
 #[macro_use]
 #[allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
@@ -148,17 +149,21 @@ pub struct MemSize(pub usize);
 
 impl fmt::Display for MemSize {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let zeros = self.0.trailing_zeros();
-        if zeros >= 40 {
-            write!(f, "{}TiB", self.0 >> 40)
-        } else if zeros >= 30 {
-            write!(f, "{}GiB", self.0 >> 30)
-        } else if zeros >= 20 {
-            write!(f, "{}MiB", self.0 >> 20)
-        } else if zeros >= 10 {
-            write!(f, "{}KiB", self.0 >> 10)
+        if self.0 == 0 {
+            write!(f, "0")
         } else {
-            write!(f, "{}B", self.0)
+            let zeros = self.0.trailing_zeros();
+            if zeros >= 40 {
+                write!(f, "{}TiB", self.0 >> 40)
+            } else if zeros >= 30 {
+                write!(f, "{}GiB", self.0 >> 30)
+            } else if zeros >= 20 {
+                write!(f, "{}MiB", self.0 >> 20)
+            } else if zeros >= 10 {
+                write!(f, "{}KiB", self.0 >> 10)
+            } else {
+                write!(f, "{}B", self.0)
+            }
         }
     }
 }

@@ -7,7 +7,8 @@
 };
 use std::{
     ffi::{c_int, c_void, CStr},
-    ptr::null_mut,
+    fmt,
+    ptr::{null, null_mut},
 };
 
 pub struct KernelFn<'m>(CUfunction, #[allow(unused)] &'m Module<'m>);
@@ -49,6 +50,13 @@ impl KernelFn<'_> {
             params as _,
             null_mut(),
         ));
+    }
+
+    #[inline]
+    pub fn name(&self) -> &CStr {
+        let mut name = null();
+        driver!(cuFuncGetName(&mut name, self.0));
+        unsafe { CStr::from_ptr(name) }
     }
 
     #[inline]
@@ -98,10 +106,42 @@ impl KernelFn<'_> {
     }
 
     #[inline]
+    pub fn info(&self) -> InfoFmt {
+        InfoFmt(self)
+    }
+
+    #[inline]
     fn get_attribute(&self, attr: CUfunction_attribute_enum) -> c_int {
         let mut value = 0;
         driver!(cuFuncGetAttribute(&mut value, attr, self.0));
         value
+    }
+}
+
+pub struct InfoFmt<'a>(&'a KernelFn<'a>);
+
+impl fmt::Display for InfoFmt<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "\
+{}
+  ptx = {}
+  bin = {}
+  max threads/block = {}
+  local mem = {}
+  static smem = {}
+  max dyn smem = {}
+  regs = {}",
+            self.0.name().to_str().unwrap(),
+            self.0.ptx_version(),
+            self.0.binary_version(),
+            self.0.max_threads_per_block(),
+            self.0.local_mem(),
+            self.0.static_smem(),
+            self.0.max_dyn_smem(),
+            self.0.num_regs(),
+        )
     }
 }
 
@@ -112,32 +152,23 @@ pub trait AsParam {
     }
 }
 
-macro_rules! impl_as_param_for {
-    ($ty:ty) => {
-        impl AsParam for $ty {}
-    };
-}
-
-impl_as_param_for!(*const DevByte);
-impl_as_param_for!(*mut DevByte);
-impl_as_param_for!(bool);
-impl_as_param_for!(i8);
-impl_as_param_for!(u8);
-impl_as_param_for!(i16);
-impl_as_param_for!(u16);
-impl_as_param_for!(i32);
-impl_as_param_for!(u32);
-impl_as_param_for!(i64);
-impl_as_param_for!(u64);
-impl_as_param_for!(f32);
-impl_as_param_for!(f64);
-impl_as_param_for!(usize);
-
-#[cfg(feature = "half")]
-impl_as_param_for!(half::f16);
-
-#[cfg(feature = "half")]
-impl_as_param_for!(half::bf16);
+impl AsParam for *const DevByte {}
+impl AsParam for *mut DevByte {}
+impl AsParam for bool {}
+impl AsParam for i8 {}
+impl AsParam for u8 {}
+impl AsParam for i16 {}
+impl AsParam for u16 {}
+impl AsParam for i32 {}
+impl AsParam for u32 {}
+impl AsParam for i64 {}
+impl AsParam for u64 {}
+impl AsParam for f32 {}
+impl AsParam for f64 {}
+impl AsParam for isize {}
+impl AsParam for usize {}
+impl AsParam for half::f16 {}
+impl AsParam for half::bf16 {}
 
 #[macro_export]
 macro_rules! params {

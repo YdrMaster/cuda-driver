@@ -5,7 +5,7 @@
     },
     AsRaw, Dim3, MemSize, Version,
 };
-use std::{ffi::c_int, ptr::null_mut};
+use std::{ffi::c_int, fmt, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct Device(CUdevice);
@@ -117,6 +117,11 @@ impl Device {
         }
     }
 
+    #[inline]
+    pub fn info(&self) -> InfoFmt {
+        InfoFmt(self)
+    }
+
     pub fn set_mempool_threshold(&self, threshold: u64) {
         let mut mempool = null_mut();
         driver!(cuDeviceGetDefaultMemPool(&mut mempool, self.0));
@@ -132,6 +137,57 @@ impl Device {
         let mut value = 0;
         driver!(cuDeviceGetAttribute(&mut value, attr, self.0));
         value
+    }
+}
+
+pub struct InfoFmt<'a>(&'a Device);
+
+impl fmt::Display for InfoFmt<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let block_limit = self.0.block_limit();
+        let sm_limit = self.0.sm_limit();
+        let grid = self.0.max_grid_dims();
+        writeln!(
+            f,
+            "\
+gpu{}
+  cc = {}
+  gmem = {}
+  alignment = {}
+  warp size = {}
+  sm count = {}
+  block limit
+    threads = {} (x: {}, y: {}, z: {})
+    smem = {} (reserved: {}, optin: {})
+    registers = {}
+  sm limit
+    blocks = {}
+    threads = {}
+    smem = {}
+    registers = {}
+  grid = (x: {}, y: {}, z: {})",
+            self.0 .0,
+            self.0.compute_capability(),
+            self.0.total_memory(),
+            self.0.alignment(),
+            self.0.warp_size(),
+            self.0.sm_count(),
+            block_limit.max_threads,
+            block_limit.max_dims.x,
+            block_limit.max_dims.y,
+            block_limit.max_dims.z,
+            block_limit.max_smem,
+            block_limit.reserved_smem,
+            block_limit.max_smem_optin,
+            block_limit.max_registers,
+            sm_limit.max_blocks,
+            sm_limit.max_threads,
+            sm_limit.max_smem,
+            sm_limit.max_registers,
+            grid.x,
+            grid.y,
+            grid.z,
+        )
     }
 }
 
@@ -157,49 +213,6 @@ pub struct SMLimit {
 fn test() {
     crate::init();
     for i in 0..Device::count() {
-        let dev = Device::new(i as _);
-        let cc = dev.compute_capability();
-        let block_limit = dev.block_limit();
-        let sm_limit = dev.sm_limit();
-        let grid = dev.max_grid_dims();
-        println!(
-            "\
-gpu{i}
-  cc = {cc}
-  gmem = {}
-  alignment = {}
-  warp size = {}
-  sm count = {}
-  block limit
-    threads = {} (x: {}, y: {}, z: {})
-    smem = {} (reserved: {}, optin: {})
-    registers = {}
-  sm limit
-    blocks = {}
-    threads = {}
-    smem = {}
-    registers = {}
-  grid = (x: {}, y: {}, z: {})
-",
-            dev.total_memory(),
-            dev.alignment(),
-            dev.warp_size(),
-            dev.sm_count(),
-            block_limit.max_threads,
-            block_limit.max_dims.x,
-            block_limit.max_dims.y,
-            block_limit.max_dims.z,
-            block_limit.max_smem,
-            block_limit.reserved_smem,
-            block_limit.max_smem_optin,
-            block_limit.max_registers,
-            sm_limit.max_blocks,
-            sm_limit.max_threads,
-            sm_limit.max_smem,
-            sm_limit.max_registers,
-            grid.x,
-            grid.y,
-            grid.z,
-        );
+        println!("{}", Device::new(i as _).info());
     }
 }
