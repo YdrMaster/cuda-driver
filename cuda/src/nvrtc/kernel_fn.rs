@@ -8,7 +8,7 @@
 use std::{
     ffi::{c_int, c_void, CStr},
     fmt,
-    ptr::{null, null_mut},
+    ptr::null_mut,
 };
 
 pub struct KernelFn<'m>(CUfunction, #[allow(unused)] &'m Module<'m>);
@@ -50,13 +50,6 @@ impl KernelFn<'_> {
             params as _,
             null_mut(),
         ));
-    }
-
-    #[inline]
-    pub fn name(&self) -> &CStr {
-        let mut name = null();
-        driver!(cuFuncGetName(&mut name, self.0));
-        unsafe { CStr::from_ptr(name) }
     }
 
     #[inline]
@@ -124,16 +117,13 @@ impl fmt::Display for InfoFmt<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "\
-{}
-  ptx = {}
+            "  ptx = {}
   bin = {}
   max threads/block = {}
   local mem = {}
   static smem = {}
   max dyn smem = {}
   regs = {}",
-            self.0.name().to_str().unwrap(),
             self.0.ptx_version(),
             self.0.binary_version(),
             self.0.max_threads_per_block(),
