@@ -1,6 +1,12 @@
-﻿use crate::{bindings::CUfunction, AsRaw, DevByte, Dim3, Module, Stream};
+﻿use crate::{
+    bindings::{
+        CUfunction,
+        CUfunction_attribute_enum::{self, *},
+    },
+    AsRaw, DevByte, Dim3, MemSize, Module, Stream, Version,
+};
 use std::{
-    ffi::{c_void, CStr},
+    ffi::{c_int, c_void, CStr},
     ptr::null_mut,
 };
 
@@ -43,6 +49,59 @@ impl KernelFn<'_> {
             params as _,
             null_mut(),
         ));
+    }
+
+    #[inline]
+    pub fn max_threads_per_block(&self) -> usize {
+        self.get_attribute(CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK) as _
+    }
+
+    #[inline]
+    pub fn static_smem(&self) -> MemSize {
+        self.get_attribute(CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES)
+            .into()
+    }
+
+    #[inline]
+    pub fn max_dyn_smem(&self) -> MemSize {
+        self.get_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES)
+            .into()
+    }
+
+    #[inline]
+    pub fn local_mem(&self) -> MemSize {
+        self.get_attribute(CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES)
+            .into()
+    }
+
+    #[inline]
+    pub fn num_regs(&self) -> MemSize {
+        self.get_attribute(CU_FUNC_ATTRIBUTE_NUM_REGS).into()
+    }
+
+    #[inline]
+    pub fn ptx_version(&self) -> Version {
+        let version = self.get_attribute(CU_FUNC_ATTRIBUTE_PTX_VERSION);
+        Version {
+            major: version / 10,
+            minor: version % 10,
+        }
+    }
+
+    #[inline]
+    pub fn binary_version(&self) -> Version {
+        let version = self.get_attribute(CU_FUNC_ATTRIBUTE_PTX_VERSION);
+        Version {
+            major: version / 10,
+            minor: version % 10,
+        }
+    }
+
+    #[inline]
+    fn get_attribute(&self, attr: CUfunction_attribute_enum) -> c_int {
+        let mut value = 0;
+        driver!(cuFuncGetAttribute(&mut value, attr, self.0));
+        value
     }
 }
 

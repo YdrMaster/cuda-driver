@@ -153,10 +153,8 @@ impl FloatScalar {
 
     fn convert(val: f32, target: cudaDataType) -> Self {
         match target {
-            #[cfg(feature = "half")]
-            cudaDataType::CUDA_R_16F => Self::new(half_::f16::from_f32(val)),
-            #[cfg(feature = "half")]
-            cudaDataType::CUDA_R_16BF => Self::new(half_::bf16::from_f32(val)),
+            cudaDataType::CUDA_R_16F => Self::new(half::f16::from_f32(val)),
+            cudaDataType::CUDA_R_16BF => Self::new(half::bf16::from_f32(val)),
             cudaDataType::CUDA_R_32F => Self::new(val),
             cudaDataType::CUDA_R_64F => Self::new(val as f64),
             _ => unimplemented!(),

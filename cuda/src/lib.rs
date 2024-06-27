@@ -1,8 +1,5 @@
 #![cfg(detected_cuda)]
 
-#[cfg(feature = "half")]
-pub extern crate half_ as half;
-
 #[macro_use]
 #[allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
 pub mod bindings {
@@ -55,14 +52,18 @@ pub fn init() {
 
 pub use context::{Context, CurrentCtx};
 pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
-pub use device::{BlockLimit, ComputeCapability, Device, SMLimit};
+pub use device::{BlockLimit, Device, SMLimit};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use spore::{ContextResource, ContextSpore, RawContainer};
 pub use stream::{Stream, StreamSpore};
 
-use std::{ffi::c_uint, fmt};
+use std::{
+    cmp::Ordering,
+    ffi::{c_int, c_uint},
+    fmt,
+};
 
 struct Blob<P> {
     ptr: P,
@@ -105,6 +106,43 @@ impl From<(c_uint, c_uint, c_uint)> for Dim3 {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Version {
+    pub major: i32,
+    pub minor: i32,
+}
+
+impl Version {
+    #[inline]
+    pub fn to_arch_string(&self) -> String {
+        format!("{}{}", self.major, self.minor)
+    }
+}
+
+impl PartialOrd for Version {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Version {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.major.cmp(&self.major) {
+            Ordering::Equal => self.minor.cmp(&other.minor),
+            other => other,
+        }
+    }
+}
+
+impl fmt::Display for Version {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}", self.major, self.minor)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(transparent)]
 pub struct MemSize(pub usize);
 
@@ -125,9 +163,9 @@ impl fmt::Display for MemSize {
     }
 }
 
-impl From<i32> for MemSize {
+impl From<c_int> for MemSize {
     #[inline]
-    fn from(value: i32) -> Self {
+    fn from(value: c_int) -> Self {
         Self(value as _)
     }
 }

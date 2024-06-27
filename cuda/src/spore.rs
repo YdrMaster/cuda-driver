@@ -36,6 +36,7 @@ pub struct RawContainer<T> {
 #[macro_export]
 macro_rules! impl_spore {
     ($resource:ident and $spore:ident by $kernel:ty) => {
+        #[repr(transparent)]
         pub struct $resource<'ctx>(
             $crate::RawContainer<$kernel>,
             std::marker::PhantomData<&'ctx ()>,

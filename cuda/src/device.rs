@@ -3,9 +3,9 @@
         CUdevice,
         CUdevice_attribute::{self, *},
     },
-    AsRaw, Dim3, MemSize,
+    AsRaw, Dim3, MemSize, Version,
 };
-use std::{cmp::Ordering, ffi::c_int, fmt, ptr::null_mut};
+use std::{ffi::c_int, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct Device(CUdevice);
@@ -43,8 +43,8 @@ impl Device {
     }
 
     #[inline]
-    pub fn compute_capability(&self) -> ComputeCapability {
-        ComputeCapability {
+    pub fn compute_capability(&self) -> Version {
+        Version {
             major: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR),
             minor: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR),
         }
@@ -128,47 +128,10 @@ impl Device {
     }
 
     #[inline]
-    fn get_attribute(&self, attr: CUdevice_attribute) -> i32 {
+    fn get_attribute(&self, attr: CUdevice_attribute) -> c_int {
         let mut value = 0;
         driver!(cuDeviceGetAttribute(&mut value, attr, self.0));
         value
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct ComputeCapability {
-    pub major: i32,
-    pub minor: i32,
-}
-
-impl ComputeCapability {
-    #[inline]
-    pub fn to_arch_string(&self) -> String {
-        format!("{}{}", self.major, self.minor)
-    }
-}
-
-impl PartialOrd for ComputeCapability {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for ComputeCapability {
-    #[inline]
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.major.cmp(&self.major) {
-            Ordering::Equal => self.minor.cmp(&other.minor),
-            other => other,
-        }
-    }
-}
-
-impl fmt::Display for ComputeCapability {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}.{}", self.major, self.minor)
     }
 }
 

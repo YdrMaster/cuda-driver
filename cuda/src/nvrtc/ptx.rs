@@ -1,6 +1,6 @@
 ﻿use crate::{
     bindings::{nvrtcCompileProgram, nvrtcResult},
-    ComputeCapability,
+    Version,
 };
 use core::fmt;
 use log::warn;
@@ -13,10 +13,7 @@ use std::{
 pub struct Ptx(CString);
 
 impl Ptx {
-    pub fn compile(
-        code: impl AsRef<str>,
-        cc: ComputeCapability,
-    ) -> (Result<Self, nvrtcResult>, String) {
+    pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, nvrtcResult>, String) {
         let code = code.as_ref();
 
         let options = collect_options(code, cc);
@@ -94,7 +91,7 @@ impl Ptx {
     }
 }
 
-fn collect_options(code: &str, cc: ComputeCapability) -> Vec<CString> {
+fn collect_options(code: &str, cc: Version) -> Vec<CString> {
     let mut options = vec![
         CString::new("--std=c++17").unwrap(),
         CString::new(format!(
