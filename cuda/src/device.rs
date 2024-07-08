@@ -42,6 +42,16 @@ impl Device {
         count as _
     }
 
+    pub fn name(&self) -> String {
+        let mut name = [0u8; 256];
+        driver!(cuDeviceGetName(
+            name.as_mut_ptr().cast(),
+            name.len() as _,
+            self.0
+        ));
+        String::from_utf8(name.iter().take_while(|&&c| c != 0).copied().collect()).unwrap()
+    }
+
     #[inline]
     pub fn compute_capability(&self) -> Version {
         Version {
@@ -150,7 +160,7 @@ impl fmt::Display for InfoFmt<'_> {
         writeln!(
             f,
             "\
-gpu{}
+GPU{} ({})
   cc = {}
   gmem = {}
   alignment = {}
@@ -167,6 +177,7 @@ gpu{}
     registers = {}
   grid = (x: {}, y: {}, z: {})",
             self.0 .0,
+            self.0.name(),
             self.0.compute_capability(),
             self.0.total_memory(),
             self.0.alignment(),
