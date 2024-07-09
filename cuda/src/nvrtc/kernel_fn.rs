@@ -8,13 +8,16 @@
 use std::{
     ffi::{c_int, c_void, CStr},
     fmt,
+    marker::PhantomData,
     ptr::null_mut,
 };
 
-pub struct KernelFn<'m>(CUfunction, #[allow(unused)] &'m Module<'m>);
+#[derive(Clone, Copy, Debug)]
+#[repr(transparent)]
+pub struct KernelFn<'m>(CUfunction, PhantomData<&'m ()>);
 
-impl<'m> Module<'m> {
-    pub fn get_kernel(&'m self, name: impl AsRef<CStr>) -> KernelFn<'m> {
+impl Module<'_> {
+    pub fn get_kernel(&self, name: impl AsRef<CStr>) -> KernelFn {
         let name = name.as_ref();
         let mut kernel = null_mut();
         driver!(cuModuleGetFunction(
@@ -22,7 +25,7 @@ impl<'m> Module<'m> {
             self.as_raw(),
             name.as_ptr().cast(),
         ));
-        KernelFn(kernel, self)
+        KernelFn(kernel, PhantomData)
     }
 }
 
