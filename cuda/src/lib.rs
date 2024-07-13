@@ -46,9 +46,17 @@ pub trait AsRaw {
     unsafe fn as_raw(&self) -> Self::Raw;
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct NoDevice;
+
 #[inline(always)]
-pub fn init() {
-    driver!(cuInit(0));
+pub fn init() -> Result<(), NoDevice> {
+    use bindings::{cuInit, CUresult::*};
+    match unsafe { cuInit(0) } {
+        CUDA_SUCCESS => Ok(()),
+        CUDA_ERROR_NO_DEVICE => Err(NoDevice),
+        e => panic!("Failed to initialize CUDA: {e:?}"),
+    }
 }
 
 pub use context::{Context, CurrentCtx};

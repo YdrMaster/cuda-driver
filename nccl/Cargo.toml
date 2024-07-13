@@ -1,6 +1,6 @@
 [package]
 name = "nccl"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
 
@@ -8,7 +8,7 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 cuda = { path = "../cuda" }
-digit-layout="0.0"
+digit-layout = "0.0"
 
 [build-dependencies]
 bindgen.workspace = true

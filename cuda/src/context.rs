@@ -173,10 +173,10 @@ impl CurrentCtx {
 
 #[test]
 fn test_primary() {
-    crate::init();
-    let Some(dev) = crate::Device::fetch() else {
+    if let Err(crate::NoDevice) = crate::init() {
         return;
-    };
+    }
+    let dev = crate::Device::new(0);
     let mut flags = 0;
     let mut active = 0;
     driver!(cuDevicePrimaryCtxGetState(

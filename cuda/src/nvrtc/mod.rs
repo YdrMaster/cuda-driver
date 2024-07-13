@@ -90,13 +90,14 @@ fn test_behavior() {
 
     let mut m = null_mut();
     let mut f = null_mut();
-    crate::init();
-    if let Some(dev) = crate::Device::fetch() {
+
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
+    crate::Device::new(0).context().apply(|_| {
+        driver!(cuModuleLoadData(&mut m, ptx.as_ptr().cast()));
+        driver!(cuModuleGetFunction(&mut f, m, name.as_ptr()));
         #[rustfmt::skip]
-        dev.context().apply(|_| {
-            driver!(cuModuleLoadData(&mut m, ptx.as_ptr().cast()));
-            driver!(cuModuleGetFunction(&mut f, m, name.as_ptr()));
-            driver!(cuLaunchKernel(f, 1, 1, 1, 1, 1, 1, 0, null_mut(), null_mut(), null_mut()));
-        });
-    };
+        driver!(cuLaunchKernel(f, 1, 1, 1, 1, 1, 1, 0, null_mut(), null_mut(), null_mut()));
+    });
 }

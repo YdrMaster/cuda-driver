@@ -68,12 +68,11 @@ impl DerefMut for HostMemSpore {
 
 #[test]
 fn test_behavior() {
-    crate::init();
-    let Some(dev) = crate::Device::fetch() else {
+    if let Err(crate::NoDevice) = crate::init() {
         return;
-    };
+    }
     let mut ptr = null_mut();
-    dev.context().apply(|_| {
+    crate::Device::new(0).context().apply(|_| {
         driver!(cuMemHostAlloc(&mut ptr, 128, 0));
         driver!(cuMemFreeHost(ptr));
     });

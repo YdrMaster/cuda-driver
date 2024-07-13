@@ -27,15 +27,6 @@ impl Device {
     }
 
     #[inline]
-    pub fn fetch() -> Option<Self> {
-        if Self::count() > 0 {
-            Some(Self::new(0))
-        } else {
-            None
-        }
-    }
-
-    #[inline]
     pub fn count() -> usize {
         let mut count = 0;
         driver!(cuDeviceGetCount(&mut count));
@@ -222,7 +213,9 @@ pub struct SMLimit {
 
 #[test]
 fn test() {
-    crate::init();
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
     for i in 0..Device::count() {
         println!("{}", Device::new(i as _).info());
     }

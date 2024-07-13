@@ -29,8 +29,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: cuda-toolkit
+        uses: Jimver/cuda-toolkit@v0.2.16
+        with:
+          method: 'network'
+
       - name: Check format
         run: cargo fmt --check
+
+      - name: Update to latest deps
+        run: cargo update
 
       - name: Run test
         run: cargo test

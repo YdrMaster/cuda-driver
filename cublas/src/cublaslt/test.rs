@@ -1,13 +1,11 @@
-﻿use std::iter::zip;
-
-use cuda::{memcpy_d2h, AsRaw, DevMem, Device, Stream};
-use rand::Rng;
-
-use crate::{
+﻿use crate::{
     bindings::{cublasComputeType_t::CUBLAS_COMPUTE_32F, cudaDataType},
     cublaslt::CublasLtMatMulLayout,
     Cublas, CublasLt, CublasLtMatMulDescriptor, CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder,
 };
+use cuda::{memcpy_d2h, AsRaw, DevMem, Stream};
+use rand::Rng;
+use std::iter::zip;
 
 fn rand_blob<'ctx>(len: usize, stream: &Stream<'ctx>) -> DevMem<'ctx> {
     let mut rng = rand::thread_rng();
@@ -18,10 +16,9 @@ fn rand_blob<'ctx>(len: usize, stream: &Stream<'ctx>) -> DevMem<'ctx> {
 
 #[test]
 fn general() {
-    cuda::init();
-    let Some(dev) = Device::fetch() else {
+    if let Err(cuda::NoDevice) = cuda::init() {
         return;
-    };
+    }
 
     const M: usize = 5376;
     const K: usize = 2048;
@@ -29,7 +26,7 @@ fn general() {
     const ALPHA: f32 = 1.;
     const BETA: f32 = 0.;
 
-    dev.context().apply(|ctx| {
+    cuda::Device::new(0).context().apply(|ctx| {
         let stream = ctx.stream();
         let dev_a = rand_blob(M * K, &stream);
         let dev_b = rand_blob(K * N, &stream);
@@ -122,10 +119,9 @@ fn general() {
 
 #[test]
 fn bench() {
-    cuda::init();
-    let Some(dev) = Device::fetch() else {
+    if let Err(cuda::NoDevice) = cuda::init() {
         return;
-    };
+    }
 
     let n = 2048 + 256 + 256;
     let k = 2048;
@@ -138,7 +134,7 @@ fn bench() {
 
     for m in 1..=128 {
         println!("m = {m} =========================");
-        dev.context().apply(|ctx| {
+        cuda::Device::new(0).context().apply(|ctx| {
             let stream = ctx.stream();
             let dev_a = rand_blob(m * k, &stream);
             let dev_b = rand_blob(k * n, &stream);
