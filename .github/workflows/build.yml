@@ -10,12 +10,9 @@
 name: CI
 
 on:
+  pull_request:
   push:
     paths-ignore:
-      - '**.md'
-      - 'LICENSE'
-  pull_request:
-    paths:
       - '**.md'
       - 'LICENSE'
 
@@ -27,7 +24,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: cuda-toolkit
         uses: Jimver/cuda-toolkit@v0.2.16
