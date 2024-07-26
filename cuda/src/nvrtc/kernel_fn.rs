@@ -3,8 +3,9 @@
         CUfunction,
         CUfunction_attribute_enum::{self, *},
     },
-    AsRaw, DevByte, Dim3, MemSize, Module, Stream, Version,
+    DevByte, Dim3, MemSize, Module, Stream, Version,
 };
+use context_spore::AsRaw;
 use std::{
     ffi::{c_int, c_void, CStr},
     fmt,

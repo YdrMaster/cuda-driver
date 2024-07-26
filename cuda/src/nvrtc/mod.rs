@@ -42,9 +42,9 @@ fn test_env() {
 #[test]
 fn test_search_symbols() {
     let code = r#"
-        extern  "C" __global__ void kernel0() { printf("Hello World from GPU!\n"); }
-        extern "C"  __device__ long kernel1() { printf("Hello World from GPU!\n"); }
-        extern "C"  __global__ void kernel2() { printf("Hello World from GPU!\n"); }
+extern "C" __global__ void kernel0() { printf("Hello World from GPU!\n"); }
+extern "C" __device__ long kernel1() { printf("Hello World from GPU!\n"); }
+extern "C" __global__ void kernel2() { printf("Hello World from GPU!\n"); }
     "#;
     assert_eq!(
         Symbol::search(code).collect::<Vec<_>>(),

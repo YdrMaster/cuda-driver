@@ -11,7 +11,7 @@ pub mod bindings {
         ($f:expr) => {{
             #[allow(unused_imports)]
             use $crate::bindings::*;
-            #[allow(unused_unsafe)]
+            #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
             assert_eq!(err, CUresult::CUDA_SUCCESS);
         }};
@@ -22,7 +22,7 @@ pub mod bindings {
         ($f:expr) => {{
             #[allow(unused_imports)]
             use $crate::bindings::*;
-            #[allow(unused_unsafe)]
+            #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
             assert_eq!(err, nvrtcResult::NVRTC_SUCCESS);
         }};
@@ -35,16 +35,7 @@ mod device;
 mod event;
 mod host_mem;
 mod nvrtc;
-mod spore;
 mod stream;
-
-pub trait AsRaw {
-    type Raw;
-    /// # Safety
-    ///
-    /// The caller must ensure that the returned item is dropped before the original item.
-    unsafe fn as_raw(&self) -> Self::Raw;
-}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct NoDevice;
@@ -60,12 +51,12 @@ pub fn init() -> Result<(), NoDevice> {
 }
 
 pub use context::{Context, CurrentCtx};
+pub use context_spore::{impl_spore, AsRaw, ContextResource, ContextSpore, RawContainer};
 pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
 pub use device::{BlockLimit, Device, SMLimit};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
-pub use spore::{ContextResource, ContextSpore, RawContainer};
 pub use stream::{Stream, StreamSpore};
 
 use std::{

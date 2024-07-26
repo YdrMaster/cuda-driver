@@ -1,7 +1,8 @@
-﻿use crate::{bindings::CUstream, impl_spore, AsRaw, CurrentCtx};
+﻿use crate::{bindings::CUstream, CurrentCtx};
+use context_spore::{impl_spore, AsRaw};
 use std::{marker::PhantomData, ptr::null_mut};
 
-impl_spore!(Stream and StreamSpore by CUstream);
+impl_spore!(Stream and StreamSpore by (CurrentCtx, CUstream));
 
 impl CurrentCtx {
     #[inline]
@@ -16,7 +17,7 @@ impl Drop for Stream<'_> {
     #[inline]
     fn drop(&mut self) {
         self.synchronize();
-        driver!(cuStreamDestroy_v2(self.0.raw));
+        driver!(cuStreamDestroy_v2(self.0.rss));
     }
 }
 
@@ -24,13 +25,13 @@ impl AsRaw for Stream<'_> {
     type Raw = CUstream;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.raw
+        self.0.rss
     }
 }
 
 impl Stream<'_> {
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuStreamSynchronize(self.0.raw));
+        driver!(cuStreamSynchronize(self.0.rss));
     }
 }

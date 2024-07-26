@@ -8,12 +8,12 @@ use std::{ffi::c_void, marker::PhantomData, mem::size_of_val, ptr::null_mut};
 pub use matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
 pub use multiply::CublasLtMatMulDescriptor;
 
-impl_spore!(CublasLt and CublasLtSpore by cublasLtHandle_t);
+impl_spore!(CublasLt and CublasLtSpore by (CurrentCtx, cublasLtHandle_t));
 
 impl Drop for CublasLt<'_> {
     #[inline]
     fn drop(&mut self) {
-        cublas!(cublasLtDestroy(self.0.raw));
+        cublas!(cublasLtDestroy(self.0.rss));
     }
 }
 
@@ -21,7 +21,7 @@ impl AsRaw for CublasLt<'_> {
     type Raw = cublasLtHandle_t;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.raw
+        self.0.rss
     }
 }
 
@@ -67,7 +67,7 @@ impl CublasLt<'_> {
 
         let mut ans_n = 0;
         cublas!(cublasLtMatmulAlgoGetHeuristic(
-            self.0.raw,
+            self.0.rss,
             layout.mat_mul.as_raw(),
             layout.a.as_raw(),
             layout.b.as_raw(),
@@ -115,7 +115,7 @@ impl CublasLt<'_> {
         assert_eq!(written, size_of_val(&dt));
 
         cublas!(cublasLtMatmul(
-            self.0.raw,
+            self.0.rss,
             layout.mat_mul.as_raw(),
             FloatScalar::convert(alpha, dt).as_ptr(),
             a_ptr.cast(),

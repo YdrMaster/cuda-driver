@@ -3,8 +3,9 @@
         CUdevice,
         CUdevice_attribute::{self, *},
     },
-    AsRaw, Dim3, MemSize, Version,
+    Dim3, MemSize, Version,
 };
+use context_spore::AsRaw;
 use std::{ffi::c_int, fmt, ptr::null_mut};
 
 #[repr(transparent)]

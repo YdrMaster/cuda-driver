@@ -1,7 +1,8 @@
 ﻿use crate::{
     bindings::{CUcontext, CUdevice},
-    AsRaw, Device, RawContainer,
+    Device,
 };
+use context_spore::{AsRaw, RawContainer};
 use std::{
     mem::{align_of, size_of},
     ptr::null_mut,
@@ -149,8 +150,8 @@ impl CurrentCtx {
     ///
     /// The raw object must be created in this [`Context`].
     #[inline]
-    pub unsafe fn wrap_raw<T>(&self, raw: T) -> RawContainer<T> {
-        RawContainer { ctx: self.0, raw }
+    pub unsafe fn wrap_raw<T: Unpin + 'static>(&self, rss: T) -> RawContainer<CUcontext, T> {
+        RawContainer { ctx: self.0, rss }
     }
 }
 

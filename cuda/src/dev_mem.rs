@@ -1,4 +1,5 @@
-﻿use crate::{bindings::CUdeviceptr, impl_spore, AsRaw, Blob, CurrentCtx, Stream};
+﻿use crate::{bindings::CUdeviceptr, Blob, CurrentCtx, Stream};
+use context_spore::{impl_spore, AsRaw};
 use std::{
     alloc::Layout,
     marker::PhantomData,
@@ -60,7 +61,7 @@ impl Stream<'_> {
     }
 }
 
-impl_spore!(DevMem and DevMemSpore by Blob<CUdeviceptr>);
+impl_spore!(DevMem and DevMemSpore by (CurrentCtx, Blob<CUdeviceptr>));
 
 impl CurrentCtx {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'_> {
@@ -108,7 +109,7 @@ impl<'ctx> Stream<'ctx> {
 impl DevMem<'_> {
     #[inline]
     pub fn drop_on(self, stream: &Stream) {
-        driver!(cuMemFreeAsync(self.0.raw.ptr, stream.as_raw()));
+        driver!(cuMemFreeAsync(self.0.rss.ptr, stream.as_raw()));
         forget(self);
     }
 }
@@ -116,7 +117,7 @@ impl DevMem<'_> {
 impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuMemFree_v2(self.0.raw.ptr));
+        driver!(cuMemFree_v2(self.0.rss.ptr));
     }
 }
 
@@ -124,10 +125,10 @@ impl Deref for DevMem<'_> {
     type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        if self.0.raw.len == 0 {
+        if self.0.rss.len == 0 {
             &[]
         } else {
-            unsafe { from_raw_parts(self.0.raw.ptr as _, self.0.raw.len) }
+            unsafe { from_raw_parts(self.0.rss.ptr as _, self.0.rss.len) }
         }
     }
 }
@@ -135,10 +136,10 @@ impl Deref for DevMem<'_> {
 impl DerefMut for DevMem<'_> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        if self.0.raw.len == 0 {
+        if self.0.rss.len == 0 {
             &mut []
         } else {
-            unsafe { from_raw_parts_mut(self.0.raw.ptr as _, self.0.raw.len) }
+            unsafe { from_raw_parts_mut(self.0.rss.ptr as _, self.0.rss.len) }
         }
     }
 }
@@ -147,18 +148,18 @@ impl AsRaw for DevMemSpore {
     type Raw = CUdeviceptr;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.raw.ptr
+        self.0.rss.ptr
     }
 }
 
 impl DevMemSpore {
     #[inline]
     pub const fn len(&self) -> usize {
-        self.0.raw.len
+        self.0.rss.len
     }
 
     #[inline]
     pub const fn is_empty(&self) -> bool {
-        self.0.raw.len == 0
+        self.0.rss.len == 0
     }
 }
