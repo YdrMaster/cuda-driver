@@ -1,3 +1,0 @@
-[submodule "cuda/cccl"]
-	path = cuda/cccl
-	url = https://github.com/NVIDIA/cccl.git

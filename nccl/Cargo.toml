@@ -7,10 +7,10 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cuda = { path = "../cuda" }
-digit-layout = "0.0"
+cuda.path = "../cuda"
+digit-layout = "0.1"
 
 [build-dependencies]
 bindgen.workspace = true
 build-script-cfg.workspace = true
-search-cuda-tools = { path = "../search-cuda-tools" }
+search-cuda-tools.path = "../search-cuda-tools"

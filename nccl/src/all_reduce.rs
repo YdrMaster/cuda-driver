@@ -21,7 +21,7 @@ impl Communicator {
                 recvbuff
             },
             recvbuff,
-            size / dt.nbytes(),
+            size / dt.nbytes().unwrap(),
             convert(dt),
             op,
             self.as_raw(),

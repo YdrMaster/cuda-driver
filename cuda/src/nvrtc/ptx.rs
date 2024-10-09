@@ -2,12 +2,15 @@
     bindings::{nvrtcCompileProgram, nvrtcResult},
     Version,
 };
-use core::fmt;
 use log::warn;
 use std::{
+    env::temp_dir,
     ffi::{c_char, CString},
+    fmt,
     path::{Path, PathBuf},
+    process::Command,
     ptr::{null, null_mut},
+    sync::OnceLock,
 };
 
 pub struct Ptx(CString);
@@ -103,10 +106,7 @@ fn collect_options(code: &str, cc: Version) -> Vec<CString> {
     fn include_dir(dir: impl AsRef<Path>) -> CString {
         CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap()
     }
-    let cccl = std::option_env!("CCCL_ROOT").map_or_else(
-        || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cccl"),
-        PathBuf::from,
-    );
+    let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
     if cccl.is_dir() {
         options.push(include_dir(cccl.join("libcudacxx/include")));
         options.push(include_dir(cccl.join("libcudacxx/include/cuda/std")));
@@ -127,4 +127,24 @@ fn collect_options(code: &str, cc: Version) -> Vec<CString> {
     }
     options.push(CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap());
     options
+}
+
+fn clone_cccl() -> PathBuf {
+    static ONCE: OnceLock<PathBuf> = OnceLock::new();
+    ONCE.get_or_init(|| {
+        let path = temp_dir();
+        if !path.is_dir() {
+            warn!("cccl not found, cloning from github");
+            Command::new("git")
+                .arg("clone")
+                .arg("https://github.com/NVIDIA/cccl")
+                .arg("--depth=1")
+                .current_dir(&path)
+                .status()
+                .unwrap();
+            warn!("cccl cloned in {}", path.display());
+        }
+        path.join("cccl")
+    })
+    .clone()
 }

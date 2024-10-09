@@ -1,6 +1,7 @@
 //! See <https://github.com/NVIDIA/nccl/issues/565>.
 
 #![cfg(detected_nccl)]
+#![deny(warnings)]
 
 #[macro_use]
 #[allow(unused, non_upper_case_globals, non_camel_case_types, non_snake_case)]
@@ -12,7 +13,7 @@ pub mod bindings {
         ($f:expr) => {{
             #[allow(unused_imports)]
             use $crate::bindings::*;
-            #[allow(unused_unsafe)]
+            #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
             assert_eq!(err, ncclResult_t::ncclSuccess);
         }};
@@ -34,17 +35,18 @@ use digit_layout::DigitLayout;
 
 #[inline]
 fn convert(data_type: DigitLayout) -> ncclDataType_t {
-    use digit_layout::types::*;
+    use digit_layout::types as ty;
+    use ncclDataType_t::*;
     match data_type {
-        I8 => ncclDataType_t::ncclInt8,
-        U8 => ncclDataType_t::ncclUint8,
-        I32 => ncclDataType_t::ncclInt32,
-        U32 => ncclDataType_t::ncclUint32,
-        I64 => ncclDataType_t::ncclInt64,
-        U64 => ncclDataType_t::ncclUint64,
-        F16 => ncclDataType_t::ncclHalf,
-        F32 => ncclDataType_t::ncclFloat,
-        F64 => ncclDataType_t::ncclDouble,
-        _ => panic!("Digit layout is not supported by NCCL"),
+        ty::I8 => ncclInt8,
+        ty::U8 => ncclUint8,
+        ty::I32 => ncclInt32,
+        ty::U32 => ncclUint32,
+        ty::I64 => ncclInt64,
+        ty::U64 => ncclUint64,
+        ty::F16 => ncclFloat16,
+        ty::F32 => ncclFloat32,
+        ty::F64 => ncclFloat64,
+        _ => panic!("{data_type} is not supported by NCCL"),
     }
 }
