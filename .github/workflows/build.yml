@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: cuda-toolkit
-        uses: Jimver/cuda-toolkit@v0.2.16
+        uses: Jimver/cuda-toolkit@v0.2.18
         with:
           method: 'network'
 
