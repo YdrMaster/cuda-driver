@@ -1,6 +1,6 @@
 ﻿fn main() {
     use build_script_cfg::Cfg;
-    use search_cuda_tools::{find_cuda_root, include_cuda};
+    use find_cuda_helper::{find_cuda_root, include_cuda};
     use std::{env, path::PathBuf};
 
     println!("cargo:rerun-if-changed=build.rs");
@@ -13,7 +13,6 @@
     include_cuda();
 
     println!("cargo:rustc-link-lib=dylib=nvrtc");
-    println!("cargo:rustc-env=CUDA_ROOT={}", cuda_root.display());
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper.h");

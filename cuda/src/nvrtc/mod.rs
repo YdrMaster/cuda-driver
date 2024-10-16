@@ -35,11 +35,6 @@ impl<'a> Symbol<'a> {
 }
 
 #[test]
-fn test_env() {
-    assert!(!std::env!("CUDA_ROOT").is_empty());
-}
-
-#[test]
 fn test_search_symbols() {
     let code = r#"
 extern "C" __global__ void kernel0() { printf("Hello World from GPU!\n"); }

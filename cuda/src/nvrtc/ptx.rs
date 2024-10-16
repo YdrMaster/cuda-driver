@@ -115,17 +115,18 @@ fn collect_options(code: &str, cc: Version) -> Vec<CString> {
     } else if code.contains("cub") || code.contains("thrust") {
         warn!("cccl not found, but cub or thrust is used in code");
     }
-    let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
-        || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),
-        PathBuf::from,
-    );
-    if cutlass.is_dir() {
-        options.push(include_dir(cutlass.join("include")));
-        options.push(CString::new("-default-device").unwrap());
-    } else if code.contains("cutlass") || code.contains("cute") {
-        warn!("cutlass not found, but cutlass or cute is used in code");
-    }
-    options.push(CString::new(format!("-I{}/include", std::env!("CUDA_ROOT"))).unwrap());
+    // let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
+    //     || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),
+    //     PathBuf::from,
+    // );
+    // if cutlass.is_dir() {
+    //     options.push(include_dir(cutlass.join("include")));
+    //     options.push(CString::new("-default-device").unwrap());
+    // } else if code.contains("cutlass") || code.contains("cute") {
+    //     warn!("cutlass not found, but cutlass or cute is used in code");
+    // }
+    let cuda_root = find_cuda_helper::find_cuda_root().unwrap();
+    options.push(CString::new(format!("-I{}/include", cuda_root.display())).unwrap());
     options
 }
 

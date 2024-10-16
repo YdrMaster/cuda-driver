@@ -13,7 +13,7 @@ half.workspace = true
 [build-dependencies]
 bindgen.workspace = true
 build-script-cfg.workspace = true
-search-cuda-tools.path = "../search-cuda-tools"
+find_cuda_helper.workspace = true
 
 [dev-dependencies]
 rand = "0.8"
