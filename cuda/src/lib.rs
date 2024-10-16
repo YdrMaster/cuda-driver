@@ -40,13 +40,21 @@ mod stream;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct NoDevice;
 
-#[inline(always)]
 pub fn init() -> Result<(), NoDevice> {
     use bindings::{cuInit, CUresult::*};
     match unsafe { cuInit(0) } {
         CUDA_SUCCESS => Ok(()),
         CUDA_ERROR_NO_DEVICE => Err(NoDevice),
         e => panic!("Failed to initialize CUDA: {e:?}"),
+    }
+}
+
+pub fn version() -> Version {
+    let mut version = 0;
+    driver!(cuDriverGetVersion(&mut version));
+    Version {
+        major: version / 1000,
+        minor: version % 1000 / 10,
     }
 }
 
@@ -179,4 +187,9 @@ impl From<usize> for MemSize {
     fn from(value: usize) -> Self {
         Self(value)
     }
+}
+
+#[test]
+fn test_version() {
+    println!("CUDA version: {}", version());
 }

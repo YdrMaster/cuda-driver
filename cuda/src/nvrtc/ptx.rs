@@ -132,19 +132,20 @@ fn collect_options(code: &str, cc: Version) -> Vec<CString> {
 fn clone_cccl() -> PathBuf {
     static ONCE: OnceLock<PathBuf> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let path = temp_dir();
-        if !path.is_dir() {
-            warn!("cccl not found, cloning from github");
+        let temp = temp_dir();
+        let cccl = temp.join("cccl");
+        if !cccl.is_dir() {
+            println!("cccl not found, cloning from github");
             Command::new("git")
                 .arg("clone")
                 .arg("https://github.com/NVIDIA/cccl")
                 .arg("--depth=1")
-                .current_dir(&path)
+                .current_dir(temp)
                 .status()
                 .unwrap();
-            warn!("cccl cloned in {}", path.display());
+            println!("cccl cloned in {}", cccl.display());
         }
-        path.join("cccl")
+        cccl
     })
     .clone()
 }
