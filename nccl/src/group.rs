@@ -44,6 +44,11 @@ impl CommunicatorGroup {
         nccl!(ncclGroupStart());
         GroupGuard(&self.0)
     }
+
+    #[inline]
+    pub fn into_vec(self) -> Vec<Communicator> {
+        self.0
+    }
 }
 
 #[repr(transparent)]
