@@ -21,7 +21,7 @@ impl Communicator {
                 recvbuff
             },
             recvbuff,
-            size / dt.nbytes().unwrap(),
+            size / dt.nbytes(),
             convert(dt),
             op,
             self.as_raw(),
@@ -32,16 +32,19 @@ impl Communicator {
 
 #[test]
 fn test() {
+    use crate::CommunicatorGroup;
     use cuda::{ContextResource, ContextSpore};
     use digit_layout::types::F32;
     use std::iter::zip;
 
     const N: usize = 12 << 10; // 10K * sizeof::<f32>() = 40K bytes
 
-    cuda::init();
+    let group = match cuda::init() {
+        Ok(()) if cuda::Device::count() >= 2 => CommunicatorGroup::new(&[0, 1]),
+        _ => return,
+    };
 
     let mut array = [1.0f32; N];
-    let group = crate::CommunicatorGroup::new(&[0, 1]);
     let contexts = group.contexts().collect::<Vec<_>>();
     let streams = contexts
         .iter()

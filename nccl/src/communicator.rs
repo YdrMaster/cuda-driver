@@ -59,14 +59,15 @@ impl Drop for Communicator {
 
 #[test]
 fn test_behavior() {
+    use cuda::NoDevice;
     use std::{ptr::null_mut, time::Instant};
 
-    cuda::init();
-    let Some(dev) = cuda::Device::fetch() else {
-        return;
+    let gpu = match cuda::init() {
+        Ok(()) => cuda::Device::new(0),
+        Err(NoDevice) => return,
     };
 
-    let devlist = [unsafe { dev.as_raw() }];
+    let devlist = [unsafe { gpu.as_raw() }];
     let time = Instant::now();
     let mut comm = null_mut();
     nccl!(ncclCommInitAll(&mut comm, 1, devlist.as_ptr()));
