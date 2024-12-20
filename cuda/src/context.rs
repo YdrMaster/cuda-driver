@@ -1,6 +1,6 @@
 ﻿use crate::{
     bindings::{CUcontext, CUdevice},
-    Device,
+    Device, MemSize,
 };
 use context_spore::{AsRaw, RawContainer};
 use std::{
@@ -106,9 +106,19 @@ impl CurrentCtx {
         Device::new(dev)
     }
 
+    /// 上下文同步。
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuCtxSynchronize());
+        driver!(cuCtxSynchronize())
+    }
+
+    /// 获取驱动反馈的当前上下文可用存储空间和总存储空间。
+    #[inline]
+    pub fn mem_info(&self) -> (MemSize, MemSize) {
+        let mut free = 0;
+        let mut total = 0;
+        driver!(cuMemGetInfo_v2(&mut free, &mut total));
+        (free.into(), total.into())
     }
 
     /// 如果存在当前上下文，在当前上下文上执行依赖上下文的操作。
@@ -202,4 +212,26 @@ fn test_primary() {
 
     driver!(cuCtxGetCurrent(&mut pctx));
     assert!(pctx.is_null());
+}
+
+#[test]
+fn test_mem_info() {
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
+    let dev = crate::Device::new(0);
+    dev.set_mempool_threshold(u64::MAX);
+    dev.context().apply(|ctx| {
+        let (free, total) = ctx.mem_info();
+        println!("mem info: {free}/{total}");
+        // 从池中分配空间
+        let stream = ctx.stream();
+        let mem = stream.malloc::<u8>((free.0 >> 30).saturating_sub(1) << 30);
+        let (free, total) = ctx.mem_info();
+        println!("mem info: {free}/{total}");
+        // 释放的存储只会回到池中，驱动不可见
+        drop(mem);
+        let (free, total) = ctx.mem_info();
+        println!("mem info: {free}/{total}")
+    })
 }
