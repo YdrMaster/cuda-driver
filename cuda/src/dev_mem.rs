@@ -3,7 +3,6 @@ use context_spore::{impl_spore, AsRaw};
 use std::{
     alloc::Layout,
     marker::PhantomData,
-    mem::{forget, size_of_val},
     ops::{Deref, DerefMut},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
@@ -81,6 +80,7 @@ impl CurrentCtx {
     }
 }
 
+#[cfg(detected_cuda)]
 impl<'ctx> Stream<'ctx> {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
@@ -106,11 +106,12 @@ impl<'ctx> Stream<'ctx> {
     }
 }
 
+#[cfg(detected_cuda)]
 impl DevMem<'_> {
     #[inline]
     pub fn drop_on(self, stream: &Stream) {
         driver!(cuMemFreeAsync(self.0.rss.ptr, stream.as_raw()));
-        forget(self);
+        std::mem::forget(self)
     }
 }
 

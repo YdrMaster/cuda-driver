@@ -1,28 +1,38 @@
 ﻿fn main() {
     use build_script_cfg::Cfg;
     use find_cuda_helper::{find_cuda_root, include_cuda};
+    use search_corex_tools::{find_corex, include_corex};
     use std::{env, path::PathBuf};
 
     println!("cargo:rerun-if-changed=build.rs");
 
     let cuda = Cfg::new("detected_cuda");
-    let Some(cuda_root) = find_cuda_root() else {
+    let iluvatar = Cfg::new("detected_iluvatar");
+    let toolkit;
+    if let Some(cuda_root) = find_cuda_root() {
+        toolkit = cuda_root;
+        include_cuda();
+        cuda.define()
+    } else if let Some(corex) = find_corex() {
+        toolkit = corex;
+        include_corex(&toolkit);
+        iluvatar.define()
+    } else {
         return;
-    };
-    cuda.define();
-    include_cuda();
+    }
 
     println!("cargo:rustc-link-lib=dylib=nvrtc");
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper.h");
+    let include = toolkit.join("include");
 
     // The bindgen::Builder is the main entry point to bindgen,
     // and lets you build up options for the resulting bindings.
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate bindings for.
         .header("wrapper.h")
-        .clang_arg(format!("-I{}/include", cuda_root.display()))
+        .clang_arg(format!("-I{}", include.display()))
         // Only generate bindings for the functions in these namespaces.
         .allowlist_function("cu.*")
         .allowlist_function("nvrtc.*")

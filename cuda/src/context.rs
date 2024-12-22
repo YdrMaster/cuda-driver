@@ -49,9 +49,16 @@ impl Drop for Context {
     #[inline]
     fn drop(&mut self) {
         if self.primary {
-            driver!(cuDevicePrimaryCtxRelease_v2(self.dev));
+            #[cfg(detected_cuda)]
+            {
+                driver!(cuDevicePrimaryCtxRelease_v2(self.dev))
+            }
+            #[cfg(detected_iluvatar)]
+            {
+                driver!(cuDevicePrimaryCtxRelease(self.dev))
+            }
         } else {
-            driver!(cuCtxDestroy_v2(self.ctx));
+            driver!(cuCtxDestroy_v2(self.ctx))
         }
     }
 }
@@ -214,6 +221,7 @@ fn test_primary() {
     assert!(pctx.is_null());
 }
 
+#[cfg(detected_cuda)]
 #[test]
 fn test_mem_info() {
     if let Err(crate::NoDevice) = crate::init() {

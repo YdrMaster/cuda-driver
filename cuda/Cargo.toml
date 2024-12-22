@@ -9,13 +9,14 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 [dependencies]
 context-spore = "0.0"
 half.workspace = true
-log = "0.4"
 find_cuda_helper.workspace = true
+log = "0.4"
 
 [build-dependencies]
 bindgen.workspace = true
 build-script-cfg.workspace = true
 find_cuda_helper.workspace = true
+search-corex-tools.path = "../search-corex-tools"
 
 [dev-dependencies]
 rand = "0.8"

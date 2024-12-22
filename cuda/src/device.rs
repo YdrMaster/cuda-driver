@@ -6,7 +6,7 @@
     Dim3, MemSize, Version,
 };
 use context_spore::AsRaw;
-use std::{ffi::c_int, fmt, ptr::null_mut};
+use std::{ffi::c_int, fmt};
 
 #[repr(transparent)]
 pub struct Device(CUdevice);
@@ -96,6 +96,7 @@ impl Device {
             max_smem_optin: self
                 .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN)
                 .into(),
+            #[cfg(detected_cuda)]
             reserved_smem: self
                 .get_attribute(CU_DEVICE_ATTRIBUTE_RESERVED_SHARED_MEMORY_PER_BLOCK)
                 .into(),
@@ -107,6 +108,7 @@ impl Device {
 
     pub fn sm_limit(&self) -> SMLimit {
         SMLimit {
+            #[cfg(detected_cuda)]
             max_blocks: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCKS_PER_MULTIPROCESSOR) as _,
             max_threads: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR)
                 as _,
@@ -124,8 +126,9 @@ impl Device {
         InfoFmt(self)
     }
 
+    #[cfg(detected_cuda)]
     pub fn set_mempool_threshold(&self, threshold: u64) {
-        let mut mempool = null_mut();
+        let mut mempool = std::ptr::null_mut();
         driver!(cuDeviceGetDefaultMemPool(&mut mempool, self.0));
         driver!(cuMemPoolSetAttribute(
             mempool,
@@ -149,6 +152,17 @@ impl fmt::Display for InfoFmt<'_> {
         let block_limit = self.0.block_limit();
         let sm_limit = self.0.sm_limit();
         let grid = self.0.max_grid_dims();
+
+        #[cfg(detected_cuda)]
+        let reserved = block_limit.reserved_smem;
+        #[cfg(detected_iluvatar)]
+        let reserved = "unknown";
+
+        #[cfg(detected_cuda)]
+        let sm_blocks = sm_limit.max_blocks;
+        #[cfg(detected_iluvatar)]
+        let sm_blocks = "unknown";
+
         writeln!(
             f,
             "\
@@ -160,10 +174,10 @@ GPU{} ({})
   sm count = {}
   block limit
     threads = {} (x: {}, y: {}, z: {})
-    smem = {} (reserved: {}, optin: {})
+    smem = {} (reserved: {reserved}, optin: {})
     registers = {}
   sm limit
-    blocks = {}
+    blocks = {sm_blocks}
     threads = {}
     smem = {}
     registers = {}
@@ -180,10 +194,8 @@ GPU{} ({})
             block_limit.max_dims.y,
             block_limit.max_dims.z,
             block_limit.max_smem,
-            block_limit.reserved_smem,
             block_limit.max_smem_optin,
             block_limit.max_registers,
-            sm_limit.max_blocks,
             sm_limit.max_threads,
             sm_limit.max_smem,
             sm_limit.max_registers,
@@ -200,12 +212,14 @@ pub struct BlockLimit {
     pub max_dims: Dim3,
     pub max_smem: MemSize,
     pub max_smem_optin: MemSize,
+    #[cfg(detected_cuda)]
     pub reserved_smem: MemSize,
     pub max_registers: MemSize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SMLimit {
+    #[cfg(detected_cuda)]
     pub max_blocks: usize,
     pub max_threads: usize,
     pub max_smem: MemSize,
