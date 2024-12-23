@@ -54,7 +54,7 @@ extern "C" __global__ void kernel2() { printf("Hello World from GPU!\n"); }
 #[test]
 fn test_behavior() {
     use std::{
-        ffi::{CStr, CString},
+        ffi::CString,
         ptr::{null, null_mut},
     };
 
@@ -74,13 +74,14 @@ fn test_behavior() {
 
         let mut ptx_len = 0;
         nvrtc!(nvrtcGetPTXSize(program, &mut ptx_len));
+        println!("ptx_len = {ptx_len}");
 
         let mut ptx = vec![0u8; ptx_len];
         nvrtc!(nvrtcGetPTX(program, ptx.as_mut_ptr().cast()));
         nvrtc!(nvrtcDestroyProgram(&mut program));
         ptx
     };
-    let ptx = CStr::from_bytes_with_nul(ptx.as_slice()).unwrap();
+    let ptx = ptx.as_slice();
     let name = CString::new("kernel").unwrap();
 
     let mut m = null_mut();
