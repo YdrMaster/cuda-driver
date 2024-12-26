@@ -14,6 +14,7 @@ half.workspace = true
 bindgen.workspace = true
 build-script-cfg.workspace = true
 find_cuda_helper.workspace = true
+search-corex-tools.path = "../search-corex-tools"
 
 [dev-dependencies]
 rand = "0.8"

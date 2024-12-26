@@ -1,4 +1,4 @@
-﻿use crate::{
+use crate::{
     bindings::{nvrtcCompileProgram, nvrtcResult},
     Version,
 };
@@ -13,7 +13,7 @@ use std::{
     sync::OnceLock,
 };
 
-pub struct Ptx(CString);
+pub struct Ptx(Vec<u8>);
 
 impl Ptx {
     pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, nvrtcResult>, String) {
@@ -72,7 +72,7 @@ impl Ptx {
             let mut ptx = vec![0u8; ptx_len];
             nvrtc!(nvrtcGetPTX(program, ptx.as_mut_ptr().cast()));
             nvrtc!(nvrtcDestroyProgram(&mut program));
-            Ok(Self(CString::from_vec_with_nul(ptx).unwrap()))
+            Ok(Self(ptx))
         } else {
             Err(result)
         };
@@ -83,37 +83,51 @@ impl Ptx {
 impl fmt::Display for Ptx {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0.to_string_lossy())
+        write!(f, "{}", String::from_utf8_lossy(&self.0))
     }
 }
 
 impl Ptx {
     #[inline]
-    pub fn as_ptr(&self) -> *const c_char {
+    pub fn as_ptr(&self) -> *const u8 {
         self.0.as_ptr()
     }
 }
 
-fn collect_options(code: &str, cc: Version) -> Vec<CString> {
+fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
     let mut options = vec![
         CString::new("--std=c++17").unwrap(),
+        #[cfg(detected_cuda)]
         CString::new(format!(
             "--gpu-architecture=compute_{}",
-            cc.to_arch_string()
+            _cc.to_arch_string()
         ))
         .unwrap(),
     ];
     fn include_dir(dir: impl AsRef<Path>) -> CString {
         CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap()
     }
-    let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
-    if cccl.is_dir() {
-        options.push(include_dir(cccl.join("libcudacxx/include")));
-        options.push(include_dir(cccl.join("libcudacxx/include/cuda/std")));
-        options.push(include_dir(cccl.join("cub")));
-        options.push(include_dir(cccl.join("thrust")));
-    } else if code.contains("cub") || code.contains("thrust") {
-        warn!("cccl not found, but cub or thrust is used in code");
+    #[cfg(detected_cuda)]
+    {
+        let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
+        if cccl.is_dir() {
+            options.push(include_dir(cccl.join("libcudacxx/include")));
+            options.push(include_dir(cccl.join("libcudacxx/include/cuda/std")));
+            options.push(include_dir(cccl.join("cub")));
+            options.push(include_dir(cccl.join("thrust")));
+        } else if code.contains("cub") || code.contains("thrust") {
+            warn!("cccl not found, but cub or thrust is used in code");
+        }
+    }
+    #[cfg(detected_iluvatar)]
+    {
+        let cccl = Path::new("/usr/local/corex/include/cub/");
+        if cccl.is_dir() {
+            options.push(include_dir(cccl));
+        } else if code.contains("cub") || code.contains("thrust") {
+            warn!("cccl not found, but cub or thrust is used in code");
+        }
+        options.pop();
     }
     // let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
     //     || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),
@@ -125,11 +139,19 @@ fn collect_options(code: &str, cc: Version) -> Vec<CString> {
     // } else if code.contains("cutlass") || code.contains("cute") {
     //     warn!("cutlass not found, but cutlass or cute is used in code");
     // }
-    let cuda_root = find_cuda_helper::find_cuda_root().unwrap();
-    options.push(CString::new(format!("-I{}/include", cuda_root.display())).unwrap());
+
+    let toolkit = if cfg!(detected_cuda) {
+        find_cuda_helper::find_cuda_root().unwrap()
+    } else if cfg!(detected_iluvatar) {
+        search_corex_tools::find_corex().unwrap()
+    } else {
+        unimplemented!()
+    };
+
+    options.push(CString::new(format!("-I{}/include", toolkit.display())).unwrap());
     options
 }
-
+#[allow(dead_code)]
 fn clone_cccl() -> PathBuf {
     static ONCE: OnceLock<PathBuf> = OnceLock::new();
     ONCE.get_or_init(|| {
