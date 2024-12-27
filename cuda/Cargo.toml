@@ -11,6 +11,7 @@ context-spore = "0.0"
 half.workspace = true
 find_cuda_helper.workspace = true
 log = "0.4"
+search-corex-tools.path = "../search-corex-tools"
 
 [build-dependencies]
 bindgen.workspace = true

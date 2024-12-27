@@ -1,4 +1,4 @@
-#![cfg(detected_cuda)]
+#![cfg(any(detected_cuda, detected_iluvatar))]
 #![deny(warnings)]
 
 #[macro_use]
@@ -19,9 +19,11 @@ pub mod bindings {
 }
 
 mod cublas;
+#[cfg(detected_cuda)]
 mod cublaslt;
 
 pub use cublas::{Cublas, CublasSpore};
+#[cfg(detected_cuda)]
 pub use cublaslt::{
     CublasLt, CublasLtMatMulDescriptor, CublasLtMatrix, CublasLtMatrixLayout, CublasLtSpore,
     MatrixOrder,
