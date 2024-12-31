@@ -1,4 +1,4 @@
-#![cfg(any(detected_cuda, detected_iluvatar))]
+#![cfg(any(nvidia, iluvatar))]
 #![deny(warnings)]
 
 #[macro_use]

@@ -96,7 +96,7 @@ impl Device {
             max_smem_optin: self
                 .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN)
                 .into(),
-            #[cfg(detected_cuda)]
+            #[cfg(nvidia)]
             reserved_smem: self
                 .get_attribute(CU_DEVICE_ATTRIBUTE_RESERVED_SHARED_MEMORY_PER_BLOCK)
                 .into(),
@@ -108,7 +108,7 @@ impl Device {
 
     pub fn sm_limit(&self) -> SMLimit {
         SMLimit {
-            #[cfg(detected_cuda)]
+            #[cfg(nvidia)]
             max_blocks: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCKS_PER_MULTIPROCESSOR) as _,
             max_threads: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR)
                 as _,
@@ -126,7 +126,7 @@ impl Device {
         InfoFmt(self)
     }
 
-    #[cfg(detected_cuda)]
+    #[cfg(nvidia)]
     pub fn set_mempool_threshold(&self, threshold: u64) {
         let mut mempool = std::ptr::null_mut();
         driver!(cuDeviceGetDefaultMemPool(&mut mempool, self.0));
@@ -153,14 +153,14 @@ impl fmt::Display for InfoFmt<'_> {
         let sm_limit = self.0.sm_limit();
         let grid = self.0.max_grid_dims();
 
-        #[cfg(detected_cuda)]
+        #[cfg(nvidia)]
         let reserved = block_limit.reserved_smem;
-        #[cfg(detected_iluvatar)]
+        #[cfg(iluvatar)]
         let reserved = "unknown";
 
-        #[cfg(detected_cuda)]
+        #[cfg(nvidia)]
         let sm_blocks = sm_limit.max_blocks;
-        #[cfg(detected_iluvatar)]
+        #[cfg(iluvatar)]
         let sm_blocks = "unknown";
 
         writeln!(
@@ -212,14 +212,14 @@ pub struct BlockLimit {
     pub max_dims: Dim3,
     pub max_smem: MemSize,
     pub max_smem_optin: MemSize,
-    #[cfg(detected_cuda)]
+    #[cfg(nvidia)]
     pub reserved_smem: MemSize,
     pub max_registers: MemSize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SMLimit {
-    #[cfg(detected_cuda)]
+    #[cfg(nvidia)]
     pub max_blocks: usize,
     pub max_threads: usize,
     pub max_smem: MemSize,

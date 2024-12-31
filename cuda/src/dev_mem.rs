@@ -80,7 +80,7 @@ impl CurrentCtx {
     }
 }
 
-#[cfg(detected_cuda)]
+#[cfg(nvidia)]
 impl<'ctx> Stream<'ctx> {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
@@ -106,7 +106,7 @@ impl<'ctx> Stream<'ctx> {
     }
 }
 
-#[cfg(detected_cuda)]
+#[cfg(nvidia)]
 impl DevMem<'_> {
     #[inline]
     pub fn drop_on(self, stream: &Stream) {

@@ -6,20 +6,25 @@ fn main() {
 
     println!("cargo:rerun-if-changed=build.rs");
 
-    let cuda = Cfg::new("detected_cuda");
-    let iluvatar = Cfg::new("detected_iluvatar");
-    let toolkit;
-    if let Some(cuda_root) = find_cuda_root() {
-        toolkit = cuda_root;
+    let nvidia = Cfg::new("nvidia");
+    let iluvatar = Cfg::new("iluvatar");
+
+    enum Vendor {
+        Nvidia,
+        Iluvatar,
+    }
+
+    let (vendor, toolkit) = if let Some(cuda_root) = find_cuda_root() {
         include_cuda();
-        cuda.define()
+        nvidia.define();
+        (Vendor::Nvidia, cuda_root)
     } else if let Some(corex) = find_corex() {
-        toolkit = corex;
-        include_corex(&toolkit);
-        iluvatar.define()
+        include_corex(&corex);
+        iluvatar.define();
+        (Vendor::Iluvatar, corex)
     } else {
         return;
-    }
+    };
 
     println!("cargo:rustc-link-lib=dylib=cublas");
     println!("cargo:rustc-link-lib=dylib=cublasLt");
@@ -29,7 +34,8 @@ fn main() {
     let include = toolkit.join("include");
     // The bindgen::Builder is the main entry point to bindgen,
     // and lets you build up options for the resulting bindings.
-    let bindings = bindgen::Builder::default()
+    let mut builder = bindgen::Builder::default();
+    builder = builder
         // The input header we would like to generate bindings for.
         .header("wrapper.h")
         .clang_arg(format!("-I{}", include.display()))
@@ -42,12 +48,14 @@ fn main() {
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,
         })
-        .clang_arg("-x")
-        .clang_arg("c++")
         // Use core instead of std in the generated bindings.
         .use_core()
         // Tell cargo to invalidate the built crate whenever any of the included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
+    if let Vendor::Iluvatar = vendor {
+        builder = builder.clang_args(["-x", "c++"])
+    }
+    let bindings = builder
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

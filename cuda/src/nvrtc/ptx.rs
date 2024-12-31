@@ -97,7 +97,7 @@ impl Ptx {
 fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
     let mut options = vec![
         CString::new("--std=c++17").unwrap(),
-        #[cfg(detected_cuda)]
+        #[cfg(nvidia)]
         CString::new(format!(
             "--gpu-architecture=compute_{}",
             _cc.to_arch_string()
@@ -107,7 +107,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
     fn include_dir(dir: impl AsRef<Path>) -> CString {
         CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap()
     }
-    #[cfg(detected_cuda)]
+    #[cfg(nvidia)]
     {
         let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
         if cccl.is_dir() {
@@ -119,7 +119,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
             warn!("cccl not found, but cub or thrust is used in code");
         }
     }
-    #[cfg(detected_iluvatar)]
+    #[cfg(iluvatar)]
     {
         let cccl = Path::new("/usr/local/corex/include/cub/");
         if cccl.is_dir() {
@@ -140,9 +140,9 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
     //     warn!("cutlass not found, but cutlass or cute is used in code");
     // }
 
-    let toolkit = if cfg!(detected_cuda) {
+    let toolkit = if cfg!(nvidia) {
         find_cuda_helper::find_cuda_root().unwrap()
-    } else if cfg!(detected_iluvatar) {
+    } else if cfg!(iluvatar) {
         search_corex_tools::find_corex().unwrap()
     } else {
         unimplemented!()

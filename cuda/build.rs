@@ -6,20 +6,19 @@
 
     println!("cargo:rerun-if-changed=build.rs");
 
-    let cuda = Cfg::new("detected_cuda");
-    let iluvatar = Cfg::new("detected_iluvatar");
-    let toolkit;
-    if let Some(cuda_root) = find_cuda_root() {
-        toolkit = cuda_root;
+    let nvidia = Cfg::new("nvidia");
+    let iluvatar = Cfg::new("iluvatar");
+    let toolkit = if let Some(cuda_root) = find_cuda_root() {
         include_cuda();
-        cuda.define()
+        nvidia.define();
+        cuda_root
     } else if let Some(corex) = find_corex() {
-        toolkit = corex;
-        include_corex(&toolkit);
-        iluvatar.define()
+        include_corex(&corex);
+        iluvatar.define();
+        corex
     } else {
         return;
-    }
+    };
 
     println!("cargo:rustc-link-lib=dylib=nvrtc");
 

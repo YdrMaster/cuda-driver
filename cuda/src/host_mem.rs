@@ -77,7 +77,7 @@ fn test_behavior() {
         driver!(cuMemHostAlloc(&mut ptr, 128, 0));
         driver!(cuMemFreeHost(ptr));
     });
-    #[cfg(detected_cuda)]
+    #[cfg(nvidia)]
     {
         // NOTICE 天数不支持这个行为，即使是释放空指针，依然需要在合法的上下文中进行
         driver!(cuMemFreeHost(null_mut()))
