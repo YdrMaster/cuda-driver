@@ -15,7 +15,7 @@ pub fn memcpy_d2h<T: Copy>(dst: &mut [T], src: &[DevByte]) {
     let len = size_of_val(dst);
     let dst = dst.as_mut_ptr().cast();
     assert_eq!(len, size_of_val(src));
-    driver!(cuMemcpyDtoH_v2(dst, src.as_ptr() as _, len));
+    driver!(cuMemcpyDtoH_v2(dst, src.as_ptr() as _, len))
 }
 
 #[inline]
@@ -23,14 +23,14 @@ pub fn memcpy_h2d<T: Copy>(dst: &mut [DevByte], src: &[T]) {
     let len = size_of_val(src);
     let src = src.as_ptr().cast();
     assert_eq!(len, size_of_val(dst));
-    driver!(cuMemcpyHtoD_v2(dst.as_ptr() as _, src, len));
+    driver!(cuMemcpyHtoD_v2(dst.as_ptr() as _, src, len))
 }
 
 #[inline]
 pub fn memcpy_d2d(dst: &mut [DevByte], src: &[DevByte]) {
     let len = size_of_val(src);
     assert_eq!(len, size_of_val(dst));
-    driver!(cuMemcpyDtoD_v2(dst.as_ptr() as _, src.as_ptr() as _, len));
+    driver!(cuMemcpyDtoD_v2(dst.as_ptr() as _, src.as_ptr() as _, len))
 }
 
 impl Stream<'_> {
@@ -44,7 +44,7 @@ impl Stream<'_> {
             src,
             len,
             self.as_raw()
-        ));
+        ))
     }
 
     #[inline]
@@ -56,7 +56,7 @@ impl Stream<'_> {
             src.as_ptr() as _,
             len,
             self.as_raw()
-        ));
+        ))
     }
 }
 
@@ -66,17 +66,16 @@ impl CurrentCtx {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'_> {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;
-        driver!(cuMemAlloc_v2(&mut ptr, len));
+        if len != 0 {
+            driver!(cuMemAlloc_v2(&mut ptr, len))
+        }
         DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 
     pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'_> {
-        let len = size_of_val(slice);
-        let src = slice.as_ptr().cast();
-        let mut ptr = 0;
-        driver!(cuMemAlloc_v2(&mut ptr, len));
-        driver!(cuMemcpyHtoD_v2(ptr, src, len));
-        DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
+        let mut dev = self.malloc::<T>(slice.len());
+        memcpy_h2d(&mut dev, slice);
+        dev
     }
 }
 
@@ -118,7 +117,9 @@ impl DevMem<'_> {
 impl Drop for DevMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuMemFree_v2(self.0.rss.ptr));
+        if self.0.rss.ptr != 0 {
+            driver!(cuMemFree_v2(self.0.rss.ptr))
+        }
     }
 }
 
