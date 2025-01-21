@@ -41,20 +41,32 @@ impl Stream<'_> {
         for i in 0..warm_up {
             f(i, self);
         }
-        let start = self.record();
+        let mut time = Duration::ZERO;
         for i in 0..times {
+            let start = self.record();
             f(i, self);
+            let end = self.record();
+            end.synchronize();
+            time += end.elapse_from(&start)
         }
-        let end = self.record();
-        end.synchronize();
-        end.elapse_from(&start).div_f32(times as _)
+        time.div_f64(times as _)
     }
 }
 
 impl Event<'_> {
     #[inline]
+    pub fn is_complete(&self) -> bool {
+        use crate::bindings::{cuEventQuery, cudaError_enum as R};
+        match unsafe { cuEventQuery(self.0.rss) } {
+            R::CUDA_SUCCESS => true,
+            R::CUDA_ERROR_NOT_READY => false,
+            err => panic!("Unexpected error: {err:?}"),
+        }
+    }
+
+    #[inline]
     pub fn synchronize(&self) {
-        driver!(cuEventSynchronize(self.0.rss));
+        driver!(cuEventSynchronize(self.0.rss))
     }
 
     #[inline]
