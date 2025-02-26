@@ -1,4 +1,4 @@
-﻿use crate::{convert, Communicator, ReduceType};
+use crate::{Communicator, ReduceType, convert};
 use cuda::{AsRaw, DevByte, Stream};
 use digit_layout::DigitLayout;
 

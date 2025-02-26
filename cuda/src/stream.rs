@@ -1,5 +1,5 @@
-﻿use crate::{bindings::CUstream, CurrentCtx};
-use context_spore::{impl_spore, AsRaw};
+use crate::{CurrentCtx, bindings::CUstream};
+use context_spore::{AsRaw, impl_spore};
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Stream and StreamSpore by (CurrentCtx, CUstream));

@@ -10,11 +10,7 @@ pub fn find_corex() -> Option<PathBuf> {
         .next()
         .unwrap_or("/usr/local/corex".into());
     let path = PathBuf::from(path);
-    if path.is_dir() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.is_dir() { Some(path) } else { None }
 }
 
 pub fn include_corex(path: impl AsRef<Path>) {

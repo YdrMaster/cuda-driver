@@ -1,5 +1,5 @@
 ﻿use crate::{Blob, CurrentCtx};
-use context_spore::{impl_spore, AsRaw};
+use context_spore::{AsRaw, impl_spore};
 use std::{
     alloc::Layout,
     marker::PhantomData,
@@ -94,7 +94,7 @@ fn bench() {
     }
     crate::Device::new(0).context().apply(|ctx| {
         let mut pagable = vec![0.0f32; 256 << 20];
-        rand::thread_rng().fill(&mut *pagable);
+        rand::rng().fill(&mut *pagable);
         let pagable = unsafe {
             from_raw_parts(
                 pagable.as_ptr().cast::<u8>() as *const u8,

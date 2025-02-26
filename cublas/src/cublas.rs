@@ -1,5 +1,5 @@
-﻿use crate::bindings::cublasHandle_t;
-use cuda::{impl_spore, AsRaw, CurrentCtx, Stream};
+use crate::bindings::cublasHandle_t;
+use cuda::{AsRaw, CurrentCtx, Stream, impl_spore};
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Cublas and CublasSpore by (CurrentCtx, cublasHandle_t));

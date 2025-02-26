@@ -1,5 +1,5 @@
-﻿use crate::{bindings::CUdeviceptr, Blob, CurrentCtx, Stream};
-use context_spore::{impl_spore, AsRaw};
+use crate::{Blob, CurrentCtx, Stream, bindings::CUdeviceptr};
+use context_spore::{AsRaw, impl_spore};
 use std::{
     alloc::Layout,
     marker::PhantomData,

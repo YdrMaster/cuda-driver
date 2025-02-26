@@ -1,6 +1,6 @@
 ﻿use crate::{
-    bindings::{CUcontext, CUdevice},
     Device, MemSize,
+    bindings::{CUcontext, CUdevice},
 };
 use context_spore::{AsRaw, RawContainer};
 use std::{
@@ -158,7 +158,8 @@ impl CurrentCtx {
     /// Generally, this method only used for [`RawContainer::ctx`] with limited lifetime.
     #[inline]
     pub unsafe fn from_raw<'ctx>(raw: &CUcontext) -> &'ctx Self {
-        &*(raw as *const _ as *const _)
+        let ptr = (&raw const *raw).cast::<Self>();
+        unsafe { &*ptr }
     }
 
     /// Wrap a raw object in a `RawContainer`.

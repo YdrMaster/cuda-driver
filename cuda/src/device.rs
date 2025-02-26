@@ -1,9 +1,9 @@
 ﻿use crate::{
+    Dim3, MemSize, Version,
     bindings::{
         CUdevice,
         CUdevice_attribute::{self, *},
     },
-    Dim3, MemSize, Version,
 };
 use context_spore::AsRaw;
 use std::{ffi::c_int, fmt};
@@ -133,7 +133,7 @@ impl Device {
         driver!(cuMemPoolSetAttribute(
             mempool,
             CUmemPool_attribute::CU_MEMPOOL_ATTR_RELEASE_THRESHOLD,
-            (&threshold) as *const _ as _,
+            (&raw const threshold) as _,
         ));
     }
 
@@ -182,7 +182,7 @@ GPU{} ({})
     smem = {}
     registers = {}
   grid = (x: {}, y: {}, z: {})",
-            self.0 .0,
+            self.0.0,
             self.0.name(),
             self.0.compute_capability(),
             self.0.total_memory(),

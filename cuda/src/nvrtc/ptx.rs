@@ -1,11 +1,11 @@
 use crate::{
-    bindings::{nvrtcCompileProgram, nvrtcResult},
     Version,
+    bindings::{nvrtcCompileProgram, nvrtcResult},
 };
 use log::warn;
 use std::{
     env::temp_dir,
-    ffi::{c_char, CString},
+    ffi::{CString, c_char},
     fmt,
     path::{Path, PathBuf},
     process::Command,

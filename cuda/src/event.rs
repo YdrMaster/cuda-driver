@@ -1,5 +1,5 @@
-﻿use crate::{bindings::CUevent, CurrentCtx, Stream};
-use context_spore::{impl_spore, AsRaw};
+use crate::{CurrentCtx, Stream, bindings::CUevent};
+use context_spore::{AsRaw, impl_spore};
 use std::{marker::PhantomData, ptr::null_mut, time::Duration};
 
 impl_spore!(Event and EventSpore by (CurrentCtx, CUevent));

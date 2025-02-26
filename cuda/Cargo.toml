@@ -1,13 +1,13 @@
 [package]
 name = "cuda"
 version = "0.0.0"
-edition = "2021"
+edition.workspace = true
 authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-context-spore = "0.0"
+context-spore = "0.1"
 half.workspace = true
 find_cuda_helper.workspace = true
 log = "0.4"
@@ -20,4 +20,4 @@ find_cuda_helper.workspace = true
 search-corex-tools.path = "../search-corex-tools"
 
 [dev-dependencies]
-rand = "0.8"
+rand = "0.9"

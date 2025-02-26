@@ -39,19 +39,19 @@ impl From<CublasLtMatrixLayout> for CublasLtMatrix {
         cublas!(cublasLtMatrixLayoutSetAttribute(
             matrix,
             cublasLtMatrixLayoutAttribute_t::CUBLASLT_MATRIX_LAYOUT_ORDER,
-            &order as *const _ as _,
+            (&raw const order).cast(),
             size_of_val(&order),
         ));
         cublas!(cublasLtMatrixLayoutSetAttribute(
             matrix,
             cublasLtMatrixLayoutAttribute_t::CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
-            &layout.batch as *const _ as _,
+            (&raw const layout.batch).cast(),
             size_of_val(&layout.batch),
         ));
         cublas!(cublasLtMatrixLayoutSetAttribute(
             matrix,
             cublasLtMatrixLayoutAttribute_t::CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
-            &layout.stride as *const _ as _,
+            (&raw const layout.stride).cast(),
             size_of_val(&layout.stride),
         ));
         Self(matrix)

@@ -1,13 +1,13 @@
 ﻿use crate::{
+    DevByte, Dim3, MemSize, Module, Stream, Version,
     bindings::{
         CUfunction,
         CUfunction_attribute_enum::{self, *},
     },
-    DevByte, Dim3, MemSize, Module, Stream, Version,
 };
 use context_spore::AsRaw;
 use std::{
-    ffi::{c_int, c_void, CStr},
+    ffi::{CStr, c_int, c_void},
     fmt,
     marker::PhantomData,
     ptr::null_mut,
@@ -142,7 +142,7 @@ impl fmt::Display for InfoFmt<'_> {
 pub trait AsParam {
     #[inline(always)]
     fn as_param(&self) -> *const c_void {
-        self as *const _ as _
+        (&raw const *self).cast()
     }
 }
 

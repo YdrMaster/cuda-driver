@@ -2,7 +2,7 @@
 mod multiply;
 
 use crate::bindings::{cublasLtHandle_t, cublasLtMatmulAlgo_t, cudaDataType};
-use cuda::{impl_spore, AsRaw, CurrentCtx, DevByte, Stream};
+use cuda::{AsRaw, CurrentCtx, DevByte, Stream, impl_spore};
 use std::{ffi::c_void, marker::PhantomData, mem::size_of_val, ptr::null_mut};
 
 pub use matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
@@ -55,7 +55,7 @@ impl CublasLt<'_> {
         cublas!(cublasLtMatmulPreferenceSetAttribute(
             preference,
             cublasLtMatmulPreferenceAttributes_t::CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
-            &workspace as *const _ as _,
+            (&raw const workspace).cast(),
             size_of_val(&workspace),
         ));
 
@@ -141,9 +141,10 @@ struct FloatScalar([u8; 8]);
 impl FloatScalar {
     fn new<T>(val: T) -> Self {
         let mut ans = Self([0; 8]);
+        debug_assert!(size_of_val(&val) <= ans.0.len());
         unsafe {
             std::ptr::copy_nonoverlapping(
-                &val as *const _ as _,
+                (&raw const val).cast(),
                 ans.0.as_mut_ptr(),
                 size_of_val(&val),
             )

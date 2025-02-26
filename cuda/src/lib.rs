@@ -41,7 +41,7 @@ mod stream;
 pub struct NoDevice;
 
 pub fn init() -> Result<(), NoDevice> {
-    use bindings::{cuInit, CUresult::*};
+    use bindings::{CUresult::*, cuInit};
     match unsafe { cuInit(0) } {
         CUDA_SUCCESS => Ok(()),
         CUDA_ERROR_NO_DEVICE => Err(NoDevice),
@@ -59,8 +59,8 @@ pub fn version() -> Version {
 }
 
 pub use context::{Context, CurrentCtx};
-pub use context_spore::{impl_spore, AsRaw, ContextResource, ContextSpore, RawContainer};
-pub use dev_mem::{memcpy_d2d, memcpy_d2h, memcpy_h2d, DevByte, DevMem, DevMemSpore};
+pub use context_spore::{AsRaw, ContextResource, ContextSpore, RawContainer, impl_spore};
+pub use dev_mem::{DevByte, DevMem, DevMemSpore, memcpy_d2d, memcpy_d2h, memcpy_h2d};
 pub use device::{BlockLimit, Device, SMLimit};
 pub use event::{Event, EventSpore};
 pub use host_mem::{HostMem, HostMemSpore};
