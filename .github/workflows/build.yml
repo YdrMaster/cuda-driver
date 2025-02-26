@@ -32,7 +32,9 @@ jobs:
           method: 'network'
 
       - name: Check format
-        run: cargo fmt --check
+        run: |
+          rustup update
+          cargo fmt --check
 
       - name: Run test
         run: cargo test --release
