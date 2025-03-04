@@ -1,4 +1,4 @@
-﻿use crate::{Blob, CurrentCtx};
+use crate::{Blob, CurrentCtx};
 use context_spore::{AsRaw, impl_spore};
 use std::{
     alloc::Layout,
@@ -147,4 +147,19 @@ fn bench() {
             )
         }
     })
+}
+
+#[test]
+fn test_managed() {
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
+    let dev = crate::Device::new(0);
+    dev.context().apply(|_ctx| {
+        let mut ptr = 0;
+        let size = 8;
+        let flags = 0x1; // CUmemAttachflags: GLOBAL = 0x1, HOST = 0x2, SINGLE = 0x4;
+        driver!(cuMemAllocManaged(&mut ptr, size, flags));
+        println!("{}", ptr);
+    });
 }
