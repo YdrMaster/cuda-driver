@@ -72,6 +72,78 @@ impl CurrentCtx {
         DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 
+    pub fn malloc_managed<T: Copy>(&self, len: usize) -> (DevMem<'_>, u64) {
+        let len = Layout::array::<T>(len).unwrap().size();
+        let mut ptr = 0;
+        let flags = 0x1; // CUmemAttachflags: GLOBAL = 0x1, HOST = 0x2, SINGLE = 0x4;
+        if len != 0 {
+            driver!(cuMemAllocManaged(&mut ptr, len, flags));
+        }
+        println!("{}", ptr);
+        (
+            DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData),
+            ptr,
+        )
+    }
+
+    pub fn malloc_vir<T: Copy>(&self, len: usize) -> (DevMem<'_>, u64, usize, u64) {
+        let len = Layout::array::<T>(len).unwrap().size();
+        //获取粒度
+        let mut granularity = 0;
+        let prop = crate::bindings::CUmemAllocationProp_st {
+            type_: crate::bindings::CUmemAllocationType_enum::CU_MEM_ALLOCATION_TYPE_PINNED,
+            requestedHandleTypes:
+                crate::bindings::CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
+            location: crate::bindings::CUmemLocation_st {
+                type_: crate::bindings::CUmemLocationType_enum::CU_MEM_LOCATION_TYPE_DEVICE,
+                id: 0,
+            },
+            win32HandleMetaData: std::ptr::null_mut(),
+            // notice: 没找到对应资料, 设为全0
+            allocFlags: crate::bindings::CUmemAllocationProp_st__bindgen_ty_1 {
+                compressionType: 0,
+                gpuDirectRDMACapable: 0,
+                usage: 0,
+                reserved: [0; 4],
+            },
+        };
+        let option = crate::bindings::CUmemAllocationGranularity_flags_enum::CU_MEM_ALLOC_GRANULARITY_MINIMUM;
+        driver!(cuMemGetAllocationGranularity(
+            &mut granularity,
+            &prop,
+            option
+        ));
+        println!("granularity: {}", granularity);
+
+        // 分配物理显存
+        let mut allochandle = 0;
+        let padded_size = ((len + granularity - 1) / granularity) * granularity;
+        let flags = 0;
+        driver!(cuMemCreate(&mut allochandle, padded_size, &prop, flags));
+        println!("allochandle: {}", allochandle);
+
+        // 映射到虚拟地址
+        let mut ptr = 0;
+        driver!(cuMemAddressReserve(&mut ptr, padded_size, 0, 0, 0));
+        driver!(cuMemMap(ptr, padded_size, 0, allochandle, 0));
+        let access_desc = crate::bindings::CUmemAccessDesc_st {
+            location: crate::bindings::CUmemLocation_st {
+                type_: crate::bindings::CUmemLocationType_enum::CU_MEM_LOCATION_TYPE_DEVICE,
+                id: 0,
+            },
+            flags: crate::bindings::CUmemAccess_flags_enum::CU_MEM_ACCESS_FLAGS_PROT_READWRITE,
+        };
+        driver!(cuMemSetAccess(ptr, padded_size, &access_desc, 1));
+        println!("ptr: {}", ptr);
+
+        (
+            DevMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData),
+            ptr,
+            padded_size,
+            allochandle,
+        )
+    }
+
     pub fn from_host<T: Copy>(&self, slice: &[T]) -> DevMem<'_> {
         let mut dev = self.malloc::<T>(slice.len());
         memcpy_h2d(&mut dev, slice);
