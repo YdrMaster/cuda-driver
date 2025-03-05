@@ -88,8 +88,21 @@ impl CurrentCtx {
 
     pub fn malloc_vir<T: Copy>(&self, len: usize) -> (DevMem<'_>, u64, usize, u64) {
         let len = Layout::array::<T>(len).unwrap().size();
+
+        // 查询压缩类型
+        let mut compression_supported = 0;
+        driver!(cuDeviceGetAttribute(&mut compression_supported, crate::bindings::CUdevice_attribute_enum::CU_DEVICE_ATTRIBUTE_GENERIC_COMPRESSION_SUPPORTED, 0));
+        // 查询设备是否支持 GPU 直接 RDMA
+        let mut gpu_direct_rdma_capable = 0;
+        driver!(cuDeviceGetAttribute(
+            &mut gpu_direct_rdma_capable,
+            crate::bindings::CUdevice_attribute_enum::CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_SUPPORTED,
+            0
+        ));
+
         //获取粒度
         let mut granularity = 0;
+        // CUmemAllocationProp_v1: https://docs.nvidia.com/cuda/cuda-driver-api/structCUmemAllocationProp__v1.html#structCUmemAllocationProp__v1
         let prop = crate::bindings::CUmemAllocationProp_st {
             type_: crate::bindings::CUmemAllocationType_enum::CU_MEM_ALLOCATION_TYPE_PINNED,
             requestedHandleTypes:
@@ -99,12 +112,11 @@ impl CurrentCtx {
                 id: 0,
             },
             win32HandleMetaData: std::ptr::null_mut(),
-            // notice: 没找到对应资料, 设为全0
             allocFlags: crate::bindings::CUmemAllocationProp_st__bindgen_ty_1 {
-                compressionType: 0,
-                gpuDirectRDMACapable: 0,
-                usage: 0,
-                reserved: [0; 4],
+                compressionType: compression_supported as u8,
+                gpuDirectRDMACapable: gpu_direct_rdma_capable as u8,
+                usage: 0, // 位掩码，表示该内存分配的预期用途; 若 usage = CU_MEM_CREATE_USAGE_TILE_POOL = 1 ，则内存分配仅用作稀疏 CUDA 数组和稀疏 CUDA mipmapped 数组的后备图块池。
+                reserved: [0; 4], // 保留供未来使用, 必须为零
             },
         };
         let option = crate::bindings::CUmemAllocationGranularity_flags_enum::CU_MEM_ALLOC_GRANULARITY_MINIMUM;
@@ -118,14 +130,25 @@ impl CurrentCtx {
         // 分配物理显存
         let mut allochandle = 0;
         let padded_size = ((len + granularity - 1) / granularity) * granularity;
-        let flags = 0;
+        let flags = 0; // flags for future use, must be zero now.
         driver!(cuMemCreate(&mut allochandle, padded_size, &prop, flags));
         println!("allochandle: {}", allochandle);
 
         // 映射到虚拟地址
         let mut ptr = 0;
-        driver!(cuMemAddressReserve(&mut ptr, padded_size, 0, 0, 0));
-        driver!(cuMemMap(ptr, padded_size, 0, allochandle, 0));
+        let alignment = 0; // default
+        let addr = 0;
+        let flags = 0; // Currently unused, must be zero
+        driver!(cuMemAddressReserve(
+            &mut ptr,
+            padded_size,
+            alignment,
+            addr,
+            flags
+        ));
+        let offset = 0; // currently must be zero.
+        let flags = 0; // flags for future use, must be zero now
+        driver!(cuMemMap(ptr, padded_size, offset, allochandle, flags));
         let access_desc = crate::bindings::CUmemAccessDesc_st {
             location: crate::bindings::CUmemLocation_st {
                 type_: crate::bindings::CUmemLocationType_enum::CU_MEM_LOCATION_TYPE_DEVICE,
@@ -133,7 +156,8 @@ impl CurrentCtx {
             },
             flags: crate::bindings::CUmemAccess_flags_enum::CU_MEM_ACCESS_FLAGS_PROT_READWRITE,
         };
-        driver!(cuMemSetAccess(ptr, padded_size, &access_desc, 1));
+        let count = 1; // Number of CUmemAccessDesc in desc
+        driver!(cuMemSetAccess(ptr, padded_size, &access_desc, count));
         println!("ptr: {}", ptr);
 
         (
