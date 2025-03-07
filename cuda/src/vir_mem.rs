@@ -85,7 +85,10 @@ impl CurrentCtx {
 
         // 分配物理显存
         let mut allochandle = 0;
-        assert!(len % granularity == 0, "len should be a multiple of granularity");
+        assert!(
+            len % granularity == 0,
+            "len should be a multiple of granularity"
+        );
         let padded_size = len;
         let flags = 0; // flags for future use, must be zero now.
         driver!(cuMemCreate(&mut allochandle, padded_size, &prop, flags));
@@ -115,12 +118,34 @@ impl CurrentCtx {
         driver!(cuMemSetAccess(ptr, padded_size, &access_desc, count));
         println!("ptr: {}, len: {}", ptr, len);
 
-        if addr == 0 { // 返回[ptr, ptr+len]
-            (VirMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData),
-            MapArgs{ptr, len, allochandle})
-        } else { // 返回[addr, addr + addr.len +len]
-            (VirMem(unsafe { self.wrap_raw(Blob { ptr: addr, len: (ptr - addr) as usize + padded_size }) }, PhantomData),
-            MapArgs{ptr, len, allochandle})
+        if addr == 0 {
+            // 返回[ptr, ptr+len]
+            (
+                VirMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData),
+                MapArgs {
+                    ptr,
+                    len,
+                    allochandle,
+                },
+            )
+        } else {
+            // 返回[addr, addr + addr.len +len]
+            (
+                VirMem(
+                    unsafe {
+                        self.wrap_raw(Blob {
+                            ptr: addr,
+                            len: (ptr - addr) as usize + padded_size,
+                        })
+                    },
+                    PhantomData,
+                ),
+                MapArgs {
+                    ptr,
+                    len,
+                    allochandle,
+                },
+            )
         }
     }
 
@@ -241,13 +266,12 @@ fn test_vir_mem() {
         assert_eq!(pagable, pagable2);
 
         // mmap_append
-        let (mut vir2, args2) = ctx.mmap::<u8>(args1.ptr as u64, len*2);
+        let (mut vir2, args2) = ctx.mmap::<u8>(args1.ptr as u64, len * 2);
         memcpy_h2d_vir(&mut vir2, &pagable3);
         memcpy_d2h_vir(pagable4, &vir2);
         assert_eq!(pagable3, pagable4);
 
         ctx.munmap(vir1, args1);
         ctx.munmap(vir2, args2);
-    }); 
+    });
 }
-

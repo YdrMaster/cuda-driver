@@ -34,9 +34,9 @@ mod dev_mem;
 mod device;
 mod event;
 mod host_mem;
+mod managed_mem;
 mod nvrtc;
 mod stream;
-mod managed_mem;
 mod vir_mem;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

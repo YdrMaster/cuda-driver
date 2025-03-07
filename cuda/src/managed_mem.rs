@@ -21,7 +21,7 @@ pub fn memcpy_d2h_man<T: Copy>(dst: &mut [T], src: &[ManByte]) {
 #[inline]
 pub fn memcpy_h2d_man<T: Copy>(dst: &mut [ManByte], src: &[T]) {
     let count = src.len();
-    let src = src.as_ptr(); 
+    let src = src.as_ptr();
     let dst = dst.as_ptr() as _;
     unsafe {
         std::ptr::copy_nonoverlapping(src, dst, count);
@@ -46,12 +46,12 @@ impl CurrentCtx {
             driver!(cuMemAllocManaged(&mut ptr, len, flags));
         }
         println!("managed ptr: {}", ptr);
-        
+
         ManMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 
     pub fn from_host_man<T: Copy>(&self, slice: &[T]) -> ManMem<'_> {
-        let mut dev= self.malloc_managed::<T>(slice.len());
+        let mut dev = self.malloc_managed::<T>(slice.len());
         memcpy_h2d_man(&mut dev, slice);
         dev
     }
@@ -136,7 +136,7 @@ fn test_managed() {
         };
 
         let size = pagable.len();
-        let mut man= ctx.malloc_managed::<u8>(size);
+        let mut man = ctx.malloc_managed::<u8>(size);
         memcpy_h2d_man(&mut man, pagable);
         memcpy_d2h_man(pagable2, &man);
 
