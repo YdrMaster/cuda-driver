@@ -14,14 +14,14 @@ fn main() {
         Iluvatar,
     }
 
-    let (vendor, toolkit) = if let Some(cuda_root) = find_cuda_root() {
-        include_cuda();
-        nvidia.define();
-        (Vendor::Nvidia, cuda_root)
-    } else if let Some(corex) = find_corex() {
+    let (vendor, toolkit) = if let Some(corex) = find_corex() {
         include_corex(&corex);
         iluvatar.define();
         (Vendor::Iluvatar, corex)
+    } else if let Some(cuda_root) = find_cuda_root() {
+        include_cuda();
+        nvidia.define();
+        (Vendor::Nvidia, cuda_root)
     } else {
         return;
     };
