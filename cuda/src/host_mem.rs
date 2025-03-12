@@ -95,17 +95,13 @@ fn bench() {
     crate::Device::new(0).context().apply(|ctx| {
         let mut pagable = vec![0.0f32; 256 << 20];
         rand::rng().fill(&mut *pagable);
-        let pagable = unsafe {
-            from_raw_parts(
-                pagable.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable),
-            )
-        };
+        let pagable =
+            unsafe { from_raw_parts(pagable.as_ptr().cast::<u8>(), size_of_val(&*pagable)) };
 
         let size = pagable.len();
 
         let mut locked = ctx.malloc_host::<u8>(size);
-        locked.copy_from_slice(&pagable);
+        locked.copy_from_slice(pagable);
 
         let stream = ctx.stream();
         let mut dev = ctx.malloc::<u8>(size);
@@ -134,7 +130,7 @@ fn bench() {
         );
         let gb = size as f32 / (1 << 30) as f32;
         for _ in 0..10 {
-            let (sync_host, sync_dev) = bench_memcpy(&pagable, &mut dev, &stream);
+            let (sync_host, sync_dev) = bench_memcpy(pagable, &mut dev, &stream);
             let (async_host, async_dev) = bench_memcpy(&locked, &mut dev, &stream);
             println!(
                 "{:^10.3?} | {:^10.3?} | {:^10} | {:^10.3?} | {:^10.3?} | {:^10}",
