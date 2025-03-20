@@ -75,7 +75,6 @@ use std::{
     fmt,
 };
 
-#[derive(Clone)]
 struct Blob<P> {
     ptr: P,
     len: usize,
