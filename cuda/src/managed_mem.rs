@@ -1,25 +1,13 @@
-use crate::{Blob, CurrentCtx, Stream, bindings::CUdeviceptr};
-use context_spore::{AsRaw, impl_spore};
+use crate::{Blob, DevByte, bindings::CUdeviceptr, memcpy_d2h};
 use std::{
     alloc::Layout,
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
     slice::{from_raw_parts, from_raw_parts_mut},
 };
 
-#[repr(transparent)]
-pub struct ManByte(#[allow(unused)] u8);
+pub struct ManBlob(Blob<CUdeviceptr>);
 
 #[inline]
-pub fn memcpy_d2h_man<T: Copy>(dst: &mut [T], src: &[ManByte]) {
-    let len = size_of_val(dst);
-    let dst = dst.as_mut_ptr().cast();
-    assert_eq!(len, size_of_val(src));
-    driver!(cuMemcpyDtoH_v2(dst, src.as_ptr() as _, len))
-}
-
-#[inline]
-pub fn memcpy_h2d_man<T: Copy>(dst: &mut [ManByte], src: &[T]) {
+pub fn memcpy_h2d_man<T: Copy>(dst: &mut [u8], src: &[T]) {
     let count = src.len();
     let src = src.as_ptr();
     let dst = dst.as_ptr() as _;
@@ -28,45 +16,8 @@ pub fn memcpy_h2d_man<T: Copy>(dst: &mut [ManByte], src: &[T]) {
     }
 }
 
-#[inline]
-pub fn _memcpy_d2d_man(dst: &mut [ManByte], src: &[ManByte]) {
-    let len = size_of_val(src);
-    assert_eq!(len, size_of_val(dst));
-    driver!(cuMemcpyDtoD_v2(dst.as_ptr() as _, src.as_ptr() as _, len))
-}
-
-impl Stream<'_> {
-    #[inline]
-    pub fn memcpy_h2d_man_stream<T: Copy>(&self, dst: &mut [ManByte], src: &[T]) {
-        let len = size_of_val(src);
-        let src = src.as_ptr().cast();
-        assert_eq!(len, size_of_val(dst));
-        driver!(cuMemcpyHtoDAsync_v2(
-            dst.as_ptr() as _,
-            src,
-            len,
-            self.as_raw()
-        ))
-    }
-
-    #[inline]
-    pub fn memcpy_d2h_man_stream<T: Copy>(&self, dst: &mut [T], src: &[ManByte]) {
-        let len = size_of_val(dst);
-        let dst = dst.as_mut_ptr().cast();
-        assert_eq!(len, size_of_val(src));
-        driver!(cuMemcpyDtoHAsync_v2(
-            dst,
-            src.as_ptr() as _,
-            len,
-            self.as_raw()
-        ))
-    }
-}
-
-impl_spore!(ManMem and ManMemSpore by (CurrentCtx, Blob<CUdeviceptr>));
-
-impl CurrentCtx {
-    pub fn malloc_managed<T: Copy>(&self, len: usize) -> ManMem<'_> {
+impl ManBlob {
+    pub fn malloc_managed<T: Copy>(len: usize) -> ManBlob {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = 0;
         // CUmemAttachflags, should be 0x1 or 0x2; GLOBAL = 0x1, HOST = 0x2; Global: Memory can be accessed by any stream on any device; Host: Memory cannot be accessed by any stream on any device
@@ -76,65 +27,58 @@ impl CurrentCtx {
         }
         println!("managed ptr: {}", ptr);
 
-        ManMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
+        ManBlob(Blob { ptr, len })
     }
 
-    pub fn from_host_man<T: Copy>(&self, slice: &[T]) -> ManMem<'_> {
-        let mut dev = self.malloc_managed::<T>(slice.len());
-        memcpy_h2d_man(&mut dev, slice);
-        dev
+    pub fn _from_host_man<T: Copy>(slice: &[T]) -> ManBlob {
+        let man = ManBlob::malloc_managed::<T>(slice.len());
+        memcpy_h2d_man(man.as_host_mut(), slice);
+        man
     }
 }
 
-impl Drop for ManMem<'_> {
+impl Drop for ManBlob {
     #[inline]
     fn drop(&mut self) {
-        if self.0.rss.ptr != 0 {
-            driver!(cuMemFree_v2(self.0.rss.ptr))
+        if self.0.ptr != 0 {
+            driver!(cuMemFree_v2(self.0.ptr))
         }
     }
 }
 
-impl Deref for ManMem<'_> {
-    type Target = [ManByte];
+impl ManBlob {
     #[inline]
-    fn deref(&self) -> &Self::Target {
-        if self.0.rss.len == 0 {
+    pub fn _as_host(&self) -> &[u8] {
+        if self.0.len == 0 {
             &[]
         } else {
-            unsafe { from_raw_parts(self.0.rss.ptr as _, self.0.rss.len) }
+            unsafe { from_raw_parts(self.0.ptr as _, self.0.len) }
         }
     }
-}
-
-impl DerefMut for ManMem<'_> {
     #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        if self.0.rss.len == 0 {
+    pub fn as_host_mut(&self) -> &mut [u8] {
+        if self.0.len == 0 {
             &mut []
         } else {
-            unsafe { from_raw_parts_mut(self.0.rss.ptr as _, self.0.rss.len) }
+            unsafe { from_raw_parts_mut(self.0.ptr as _, self.0.len) }
         }
     }
-}
 
-impl AsRaw for ManMemSpore {
-    type Raw = CUdeviceptr;
     #[inline]
-    unsafe fn as_raw(&self) -> Self::Raw {
-        self.0.rss.ptr
+    pub fn as_dev(&self) -> &[DevByte] {
+        if self.0.len == 0 {
+            &[]
+        } else {
+            unsafe { from_raw_parts(self.0.ptr as _, self.0.len) }
+        }
     }
-}
-
-impl ManMemSpore {
     #[inline]
-    pub const fn len(&self) -> usize {
-        self.0.rss.len
-    }
-
-    #[inline]
-    pub const fn is_empty(&self) -> bool {
-        self.0.rss.len == 0
+    pub fn as_dev_mut(&self) -> &mut [DevByte] {
+        if self.0.len == 0 {
+            &mut []
+        } else {
+            unsafe { from_raw_parts_mut(self.0.ptr as _, self.0.len) }
+        }
     }
 }
 
@@ -146,7 +90,7 @@ fn test_managed() {
         return;
     }
     let dev = crate::Device::new(0);
-    dev.context().apply(|ctx| {
+    dev.context().apply(|_ctx| {
         let mut pagable = vec![0.0f32; 256 << 10];
         rand::rng().fill(&mut *pagable);
         let pagable = unsafe {
@@ -165,9 +109,9 @@ fn test_managed() {
         };
 
         let size = pagable.len();
-        let mut man = ctx.malloc_managed::<u8>(size);
-        memcpy_h2d_man(&mut man, pagable);
-        memcpy_d2h_man(pagable2, &man);
+        let man = ManBlob::malloc_managed::<u8>(size);
+        memcpy_h2d_man(man.as_host_mut(), pagable);
+        memcpy_d2h(pagable2, man.as_dev());
 
         assert_eq!(pagable, pagable2);
     });
@@ -209,19 +153,19 @@ fn test_behavior_multi_stream_async_access() {
         };
 
         let size = pagable.len();
-        let mut man = ctx.malloc_managed::<u8>(size);
+        let man = ManBlob::malloc_managed::<u8>(size);
 
         let stream0 = ctx.stream();
         let stream1 = ctx.stream();
         let stream2 = ctx.stream();
 
-        stream0.memcpy_h2d_man_stream(&mut man, pagable);
+        stream0.memcpy_h2d(man.as_dev_mut(), pagable);
         let event = stream0.record();
 
-        stream2.memcpy_d2h_man_stream(pagable3, &man);
+        stream2.memcpy_d2h(pagable3, man.as_dev());
 
         stream1.wait_for(&event);
-        stream1.memcpy_d2h_man_stream(pagable2, &man);
+        stream1.memcpy_d2h(pagable2, man.as_dev());
 
         assert_eq!(pagable, pagable2);
         assert_eq!(pagable, pagable3); // 在host上检验时会等待device同步, 检测不出来stream2未使用event进行同步操作

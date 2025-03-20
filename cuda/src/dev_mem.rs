@@ -48,6 +48,19 @@ impl Stream<'_> {
     }
 
     #[inline]
+    pub fn memcpy_d2h<T: Copy>(&self, dst: &mut [T], src: &[DevByte]) {
+        let len = size_of_val(dst);
+        let dst = dst.as_mut_ptr().cast();
+        assert_eq!(len, size_of_val(src));
+        driver!(cuMemcpyDtoHAsync_v2(
+            dst,
+            src.as_ptr() as _,
+            len,
+            self.as_raw()
+        ))
+    }
+
+    #[inline]
     pub fn memcpy_d2d(&self, dst: &mut [DevByte], src: &[DevByte]) {
         let len = size_of_val(src);
         assert_eq!(len, size_of_val(dst));
