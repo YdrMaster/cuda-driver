@@ -12,6 +12,7 @@ half.workspace = true
 find_cuda_helper.workspace = true
 log = "0.4"
 search-corex-tools.path = "../search-corex-tools"
+lazy_static = "1.5.0"
 
 [build-dependencies]
 bindgen.workspace = true
