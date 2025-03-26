@@ -17,7 +17,7 @@ pub fn memcpy_h2m<T: Copy>(dst: &mut [u8], src: &[T]) {
 }
 
 #[inline]
-pub fn _memcpy_m2h<T: Copy>(dst: &mut [T], src: &[u8]) {
+pub fn memcpy_m2h<T: Copy>(dst: &mut [T], src: &[u8]) {
     let count = src.len();
     let src = src.as_ptr();
     let dst = dst.as_ptr() as _;
@@ -58,7 +58,7 @@ impl Drop for ManBlob {
 
 impl ManBlob {
     #[inline]
-    pub fn _as_host(&self) -> &[u8] {
+    pub fn as_host(&self) -> &[u8] {
         if self.0.len == 0 {
             &[]
         } else {
@@ -184,109 +184,28 @@ fn test_behavior_multi_stream_async_access() {
 
 #[test]
 fn test_behavior_multi_context_access() {
-    use lazy_static::lazy_static;
-    use rand::Rng;
-    use std::sync::{Arc, Mutex};
-
-    // 定义全局变量
-    lazy_static! {
-        static ref GLOBAL_MAN: Arc<Mutex<Option<ManBlob>>> = Arc::new(Mutex::new(None));
-    }
-
     if let Err(crate::NoDevice) = crate::init() {
         return;
     }
     let dev = crate::Device::new(0);
-
-    let ctx1 = dev.context();
-    let ctx2 = dev.context();
-    // 第一个上下文：创建并使用 `man`
-    ctx1.apply(|_ctx| {
-        let mut pagable = vec![0.0f32; 256 << 10];
-        rand::rng().fill(&mut *pagable);
-        let pagable = unsafe {
-            from_raw_parts(
-                pagable.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable),
-            )
-        };
-
-        let pagable2 = vec![0.0f32; 256 << 10];
-        let pagable2 = unsafe {
-            from_raw_parts_mut(
-                pagable2.as_ptr().cast::<u8>() as *mut u8,
-                size_of_val(&*pagable2),
-            )
-        };
-
-        let size = pagable.len();
-        let man = ManBlob::malloc_managed::<u8>(size); // 创建man对象
-        memcpy_h2m(man.as_host_mut(), pagable);
-        memcpy_d2h(pagable2, man.as_dev());
-
-        assert_eq!(pagable, pagable2);
-
-        // 将man对象存储到全局变量中
-        let mut global_man = GLOBAL_MAN.lock().unwrap();
-        *global_man = Some(man);
-    });
-
-    // 第二个上下文：使用第一个上下文中的 `man` 对象
-    ctx2.apply(|_ctx| {
-        let mut pagable = vec![0.0f32; 256 << 10];
-        rand::rng().fill(&mut *pagable);
-        let pagable = unsafe {
-            from_raw_parts(
-                pagable.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable),
-            )
-        };
-
-        let pagable2 = vec![0.0f32; 256 << 10];
-        let pagable2 = unsafe {
-            from_raw_parts_mut(
-                pagable2.as_ptr().cast::<u8>() as *mut u8,
-                size_of_val(&*pagable2),
-            )
-        };
-
-        let _size = pagable.len();
-        // 从全局变量中获取man对象
-        let global_man = GLOBAL_MAN.lock().unwrap();
-        if let Some(ref man) = *global_man {
-            memcpy_h2m(man.as_host_mut(), pagable);
-            memcpy_d2h(pagable2, man.as_dev());
-
-            assert_eq!(pagable, pagable2);
-        }
-    });
-}
-
-#[test]
-fn test_behavior_multi_context_access2() {
-    use std::ptr::copy_nonoverlapping;
-    if let Err(crate::NoDevice) = crate::init() {
-        return;
-    }
-    let dev = crate::Device::new(0);
-    let mut man_mem = 0;
+    let mut man_global: Option<ManBlob> = None;
     let host = (0..256 << 10).map(|x| x as f32).collect::<Vec<_>>();
     let size = size_of_val(host.as_slice());
     let ctx1 = dev.context();
     let ctx2 = dev.context();
     ctx1.apply(|_ctx| {
-        driver!(cuMemAllocManaged(&mut man_mem, size, 0x1));
-        let dev_slice = unsafe { from_raw_parts_mut(man_mem as *mut DevByte, size) };
-        crate::memcpy_h2d(dev_slice, host.as_slice());
+        let man_mem = ManBlob::malloc_managed::<u8>(size);
+        crate::memcpy_h2d(man_mem.as_dev_mut(), host.as_slice()); // ctx1访问man_mem
+        man_global = Some(man_mem);
     });
     let mut host2 = vec![0.0f32; host.len()];
-    unsafe { copy_nonoverlapping(man_mem as *mut u8, host2.as_mut_ptr().cast(), size) }
+    memcpy_m2h(host2.as_mut_slice(), man_global.as_ref().unwrap().as_host()); // host访问man_mem
     assert_eq!(host, host2);
     ctx2.apply(|_ctx| {
-        let dev_slice = unsafe { from_raw_parts_mut(man_mem as *mut DevByte, size) };
-        memcpy_d2h(host2.as_mut_slice(), &dev_slice);
+        memcpy_d2h(host2.as_mut_slice(), man_global.as_ref().unwrap().as_dev()); // ctx2访问man_mem
     });
     assert_eq!(host, host2);
+    man_global.take(); // 手动释放man_global
 }
 
 #[test]
