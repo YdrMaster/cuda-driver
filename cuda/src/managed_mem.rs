@@ -188,24 +188,22 @@ fn test_behavior_multi_context_access() {
         return;
     }
     let dev = crate::Device::new(0);
-    let mut man_global: Option<ManBlob> = None;
     let host = (0..256 << 10).map(|x| x as f32).collect::<Vec<_>>();
     let size = size_of_val(host.as_slice());
     let ctx1 = dev.context();
     let ctx2 = dev.context();
-    ctx1.apply(|_ctx| {
+    let man_mem = ctx1.apply(|_ctx| {
         let man_mem = ManBlob::malloc_managed::<u8>(size);
         crate::memcpy_h2d(man_mem.as_dev_mut(), host.as_slice()); // ctx1访问man_mem
-        man_global = Some(man_mem);
+        man_mem
     });
     let mut host2 = vec![0.0f32; host.len()];
-    memcpy_m2h(host2.as_mut_slice(), man_global.as_ref().unwrap().as_host()); // host访问man_mem
+    memcpy_m2h(host2.as_mut_slice(), man_mem.as_host()); // host访问man_mem
     assert_eq!(host, host2);
     ctx2.apply(|_ctx| {
-        memcpy_d2h(host2.as_mut_slice(), man_global.as_ref().unwrap().as_dev()); // ctx2访问man_mem
+        memcpy_d2h(host2.as_mut_slice(), man_mem.as_dev()); // ctx2访问man_mem
     });
     assert_eq!(host, host2);
-    man_global.take(); // 手动释放man_global
 }
 
 #[test]
