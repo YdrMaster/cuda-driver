@@ -10,6 +10,7 @@ use std::{
 #[repr(transparent)]
 pub struct VirByte(#[allow(unused)] u8);
 
+#[allow(dead_code)]
 #[inline]
 pub fn memcpy_d2h_vir<T: Copy>(dst: &mut [T], src: &[VirByte]) {
     let len = size_of_val(dst);
