@@ -227,12 +227,8 @@ fn test_vir_mem() {
     dev.context().apply(|ctx| {
         let mut pagable = vec![0.0f32; 2 << 20];
         rand::rng().fill(&mut *pagable);
-        let pagable = unsafe {
-            from_raw_parts(
-                pagable.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable),
-            )
-        };
+        let pagable =
+            unsafe { from_raw_parts(pagable.as_ptr().cast::<u8>(), size_of_val(&*pagable)) };
 
         let pagable2 = vec![0.0f32; 2 << 20];
         let pagable2 = unsafe {
@@ -244,12 +240,8 @@ fn test_vir_mem() {
 
         let mut pagable3 = vec![0.0f32; 6 << 20];
         rand::rng().fill(&mut *pagable3);
-        let pagable3 = unsafe {
-            from_raw_parts(
-                pagable3.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable3),
-            )
-        };
+        let pagable3 =
+            unsafe { from_raw_parts(pagable3.as_ptr().cast::<u8>(), size_of_val(&*pagable3)) };
 
         let pagable4 = vec![0.0f32; 6 << 20];
         let pagable4 = unsafe {
@@ -262,13 +254,13 @@ fn test_vir_mem() {
         let len = pagable.len();
         // mmap
         let (mut vir1, args1) = ctx.mmap::<u8>(0, len);
-        memcpy_h2d_vir(&mut vir1, &pagable);
+        memcpy_h2d_vir(&mut vir1, pagable);
         memcpy_d2h_vir(pagable2, &vir1);
         assert_eq!(pagable, pagable2);
 
         // mmap_append
-        let (mut vir2, args2) = ctx.mmap::<u8>(args1.ptr as u64, len * 2);
-        memcpy_h2d_vir(&mut vir2, &pagable3);
+        let (mut vir2, args2) = ctx.mmap::<u8>(args1.ptr, len * 2);
+        memcpy_h2d_vir(&mut vir2, pagable3);
         memcpy_d2h_vir(pagable4, &vir2);
         assert_eq!(pagable3, pagable4);
 

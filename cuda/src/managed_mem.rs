@@ -108,12 +108,8 @@ fn test_managed() {
     dev.context().apply(|_ctx| {
         let mut pagable = vec![0.0f32; 256 << 10];
         rand::rng().fill(&mut *pagable);
-        let pagable = unsafe {
-            from_raw_parts(
-                pagable.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable),
-            )
-        };
+        let pagable =
+            unsafe { from_raw_parts(pagable.as_ptr().cast::<u8>(), size_of_val(&*pagable)) };
 
         let pagable2 = vec![0.0f32; 256 << 10];
         let pagable2 = unsafe {
@@ -144,27 +140,17 @@ fn test_behavior_multi_stream_async_access() {
     dev.context().apply(|ctx| {
         let mut pagable = vec![0.0f32; 256 << 10];
         rand::rng().fill(&mut *pagable);
-        let pagable = unsafe {
-            from_raw_parts(
-                pagable.as_ptr().cast::<u8>() as *const u8,
-                size_of_val(&*pagable),
-            )
-        };
+        let pagable =
+            unsafe { from_raw_parts(pagable.as_ptr().cast::<u8>(), size_of_val(&*pagable)) };
 
         let mut pagable2 = vec![0.0f32; 256 << 10];
         let pagable2 = unsafe {
-            from_raw_parts_mut(
-                pagable2.as_mut_ptr().cast::<u8>() as *mut u8,
-                size_of_val(&*pagable2),
-            )
+            from_raw_parts_mut(pagable2.as_mut_ptr().cast::<u8>(), size_of_val(&*pagable2))
         };
 
         let mut pagable3 = vec![0.0f32; 256 << 10];
         let pagable3 = unsafe {
-            from_raw_parts_mut(
-                pagable3.as_mut_ptr().cast::<u8>() as *mut u8,
-                size_of_val(&*pagable3),
-            )
+            from_raw_parts_mut(pagable3.as_mut_ptr().cast::<u8>(), size_of_val(&*pagable3))
         };
 
         let size = pagable.len();
