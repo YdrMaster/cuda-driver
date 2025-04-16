@@ -8,14 +8,14 @@
 
     let nvidia = Cfg::new("nvidia");
     let iluvatar = Cfg::new("iluvatar");
-    let toolkit = if let Some(cuda_root) = find_cuda_root() {
-        include_cuda();
-        nvidia.define();
-        cuda_root
-    } else if let Some(corex) = find_corex() {
+    let toolkit = if let Some(corex) = find_corex() {
         include_corex(&corex);
         iluvatar.define();
         corex
+    } else if let Some(cuda_root) = find_cuda_root() {
+        include_cuda();
+        nvidia.define();
+        cuda_root
     } else {
         return;
     };

@@ -31,10 +31,11 @@ jobs:
         with:
           method: 'network'
 
+      - name: Use latest toolchain
+        run: rustup update
+
       - name: Check format
-        run: |
-          rustup update
-          cargo fmt --check
+        run: cargo fmt --check
 
       - name: Run test
         run: cargo test --release
@@ -46,6 +47,7 @@ jobs:
         run:
           cargo clippy
           --all-features
+          --all-targets
           --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
         continue-on-error: true
 
