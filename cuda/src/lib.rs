@@ -34,8 +34,10 @@ mod dev_mem;
 mod device;
 mod event;
 mod host_mem;
+mod managed_mem;
 mod nvrtc;
 mod stream;
+mod vir_mem;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct NoDevice;
