@@ -25,8 +25,6 @@ impl Drop for CublasLtMatrix {
 
 impl From<CublasLtMatrixLayout> for CublasLtMatrix {
     fn from(layout: CublasLtMatrixLayout) -> Self {
-        use std::mem::size_of_val;
-
         let mut matrix = null_mut();
         cublas!(cublasLtMatrixLayoutCreate(
             &mut matrix,

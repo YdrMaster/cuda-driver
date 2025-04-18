@@ -53,7 +53,7 @@ impl KernelFn<'_> {
             stream.map_or(null_mut(), |x| x.as_raw()),
             params as _,
             null_mut(),
-        ));
+        ))
     }
 
     #[inline]
@@ -177,11 +177,11 @@ fn test_macro() {
     let params = params![1i32, 2i32, 3i32, 4i32, 5i32];
     assert!(params.windows(2).all(|s| !s[0].is_null()
         && !s[1].is_null()
-        && s[1] == unsafe { s[0].add(std::mem::size_of::<i32>()) }));
+        && s[1] == unsafe { s[0].add(size_of::<i32>()) }));
 
     let params = params
         .into_iter()
         .map(|ptr| unsafe { *(ptr as *const i32) })
         .collect::<Vec<_>>();
-    assert_eq!(params, [1, 2, 3, 4, 5]);
+    assert_eq!(params, [1, 2, 3, 4, 5])
 }
