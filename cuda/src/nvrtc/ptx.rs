@@ -2,17 +2,17 @@ use crate::{
     Version,
     bindings::{nvrtcCompileProgram, nvrtcResult},
 };
-use log::warn;
 use std::{
     env::temp_dir,
     ffi::{CString, c_char},
     fmt,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Command,
     ptr::{null, null_mut},
     sync::OnceLock,
 };
 
+#[repr(transparent)]
 pub struct Ptx(Vec<u8>);
 
 impl Ptx {
@@ -29,10 +29,10 @@ impl Ptx {
             let mut headers = String::new();
 
             if code.contains("half") {
-                headers.push_str("#include <cuda_fp16.h>\n");
+                headers.push_str("#include <cuda_fp16.h>\n")
             }
             if code.contains("nv_bfloat16") {
-                headers.push_str("#include <cuda_bf16.h>\n");
+                headers.push_str("#include <cuda_bf16.h>\n")
             }
 
             if !headers.is_empty() {
@@ -104,31 +104,33 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
         ))
         .unwrap(),
     ];
-    fn include_dir(dir: impl AsRef<Path>) -> CString {
-        CString::new(format!("-I{}\n", dir.as_ref().display())).unwrap()
+    fn include_dir(dir: impl fmt::Display) -> CString {
+        CString::new(format!("-I{dir}\n")).unwrap()
     }
     #[cfg(nvidia)]
     {
-        let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
-        if cccl.is_dir() {
-            options.push(include_dir(cccl.join("libcudacxx/include")));
-            options.push(include_dir(cccl.join("libcudacxx/include/cuda/std")));
-            options.push(include_dir(cccl.join("cub")));
-            options.push(include_dir(cccl.join("thrust")));
-        } else if code.contains("cub") || code.contains("thrust") {
-            warn!("cccl not found, but cub or thrust is used in code");
+        use std::sync::LazyLock;
+        static VERSION: LazyLock<Version> = LazyLock::new(crate::version);
+
+        if VERSION.major < 12 {
+            let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
+            if cccl.is_dir() {
+                const DIRS: &[&str] = &[
+                    "libcudacxx/include",
+                    "libcudacxx/include/cuda/std",
+                    "cub",
+                    "thrust",
+                ];
+                options.extend(
+                    DIRS.iter()
+                        .map(|path| include_dir(cccl.join(path).display())),
+                )
+            } else if code.contains("cub") || code.contains("thrust") {
+                log::warn!("cccl not found, but cub or thrust is used in code")
+            }
         }
     }
-    #[cfg(iluvatar)]
-    {
-        let cccl = Path::new("/usr/local/corex/include/cub/");
-        if cccl.is_dir() {
-            options.push(include_dir(cccl));
-        } else if code.contains("cub") || code.contains("thrust") {
-            warn!("cccl not found, but cub or thrust is used in code");
-        }
-        options.pop();
-    }
+
     // let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
     //     || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),
     //     PathBuf::from,
@@ -148,7 +150,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
         unimplemented!()
     };
 
-    options.push(CString::new(format!("-I{}/include", toolkit.display())).unwrap());
+    options.push(include_dir(toolkit.display()));
     options
 }
 #[allow(dead_code)]
@@ -160,13 +162,17 @@ fn clone_cccl() -> PathBuf {
         if !cccl.is_dir() {
             println!("cccl not found, cloning from github");
             Command::new("git")
-                .arg("clone")
-                .arg("https://github.com/NVIDIA/cccl")
-                .arg("--depth=1")
+                .args([
+                    "clone",
+                    "https://github.com/NVIDIA/cccl",
+                    "--branch",
+                    "v2.8.3",
+                    "--depth=1",
+                ])
                 .current_dir(temp)
                 .status()
                 .unwrap();
-            println!("cccl cloned in {}", cccl.display());
+            println!("cccl cloned in {}", cccl.display())
         }
         cccl
     })

@@ -191,5 +191,5 @@ impl From<usize> for MemSize {
 
 #[test]
 fn test_version() {
-    println!("CUDA version: {}", version());
+    println!("CUDA version: {}", version())
 }
