@@ -2,6 +2,8 @@
 mod module;
 mod ptx;
 
+use std::{ffi::CString, str::FromStr};
+
 pub use kernel_fn::{AsParam, KernelFn};
 pub use module::{Module, ModuleSpore};
 pub use ptx::Ptx;
@@ -31,6 +33,12 @@ impl<'a> Symbol<'a> {
                     None
                 }
             })
+    }
+
+    pub fn to_c_string(&self) -> CString {
+        match self {
+            Self::Global(s) | Self::Device(s) => CString::from_str(s).unwrap(),
+        }
     }
 }
 
