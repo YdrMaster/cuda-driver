@@ -8,13 +8,15 @@ pub mod bindings {
 
     #[macro_export]
     macro_rules! driver {
-        ($f:expr) => {{
+        ($expected:ident, $f:expr) => {{
             #[allow(unused_imports)]
             use $crate::bindings::*;
             #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
-            assert_eq!(err, CUresult::CUDA_SUCCESS);
+            assert_eq!(err, CUresult::$expected);
         }};
+
+        ($f:expr) => {{ driver!(CUDA_SUCCESS, $f) }};
     }
 
     #[macro_export]
@@ -64,7 +66,7 @@ pub use context_spore::{AsRaw, ContextResource, ContextSpore, RawContainer, impl
 pub use dev_mem::{DevByte, DevMem, DevMemSpore, memcpy_d2d, memcpy_d2h, memcpy_h2d};
 pub use device::{BlockLimit, Device, SMLimit};
 pub use event::{Event, EventSpore};
-pub use graph::{CaptureStream, Graph, GraphSpore};
+pub use graph::{CaptureStream, Graph, GraphNode, GraphSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use stream::{Stream, StreamSpore};

@@ -1,9 +1,10 @@
 ﻿use crate::{
-    DevByte, Dim3, MemSize, Module, Stream, Version,
+    Dim3, MemSize, Module, Stream, Version,
     bindings::{
         CUfunction,
-        CUfunction_attribute_enum::{self, *},
+        CUfunction_attribute::{self, *},
     },
+    graph::KernelNode,
 };
 use context_spore::AsRaw;
 use std::{
@@ -27,6 +28,21 @@ impl Module<'_> {
             name.as_ptr().cast(),
         ));
         KernelFn(kernel, PhantomData)
+    }
+}
+
+impl KernelNode<'_> {
+    pub fn get_kernel(&self) -> KernelFn {
+        let params = self.get_params();
+        KernelFn(params.func, PhantomData)
+    }
+}
+
+impl AsRaw for KernelFn<'_> {
+    type Raw = CUfunction;
+
+    unsafe fn as_raw(&self) -> Self::Raw {
+        self.0
     }
 }
 
@@ -108,7 +124,7 @@ impl KernelFn<'_> {
     }
 
     #[inline]
-    fn get_attribute(&self, attr: CUfunction_attribute_enum) -> c_int {
+    fn get_attribute(&self, attr: CUfunction_attribute) -> c_int {
         let mut value = 0;
         driver!(cuFuncGetAttribute(&mut value, attr, self.0));
         value
@@ -146,23 +162,7 @@ pub trait AsParam {
     }
 }
 
-impl AsParam for *const DevByte {}
-impl AsParam for *mut DevByte {}
-impl AsParam for bool {}
-impl AsParam for i8 {}
-impl AsParam for u8 {}
-impl AsParam for i16 {}
-impl AsParam for u16 {}
-impl AsParam for i32 {}
-impl AsParam for u32 {}
-impl AsParam for i64 {}
-impl AsParam for u64 {}
-impl AsParam for f32 {}
-impl AsParam for f64 {}
-impl AsParam for isize {}
-impl AsParam for usize {}
-impl AsParam for half::f16 {}
-impl AsParam for half::bf16 {}
+impl<T: Copy> AsParam for T {}
 
 #[macro_export]
 macro_rules! params {

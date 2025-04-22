@@ -4,7 +4,6 @@ resolver = "3"
 package.edition = "2024"
 
 [workspace.dependencies]
-half = "2.4"
 bindgen = "0.71"
 build-script-cfg = "0.1"
 find_cuda_helper = "0.2"
