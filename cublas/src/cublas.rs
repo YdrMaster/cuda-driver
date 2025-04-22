@@ -7,7 +7,7 @@ impl_spore!(Cublas and CublasSpore by (CurrentCtx, cublasHandle_t));
 impl Drop for Cublas<'_> {
     #[inline]
     fn drop(&mut self) {
-        cublas!(cublasDestroy_v2(self.0.rss));
+        cublas!(cublasDestroy_v2(self.0.rss))
     }
 }
 

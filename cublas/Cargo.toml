@@ -8,7 +8,7 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 cuda.path = "../cuda"
-half.workspace = true
+half = "2.4"
 
 [build-dependencies]
 bindgen.workspace = true

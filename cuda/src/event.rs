@@ -56,10 +56,10 @@ impl Stream<'_> {
 impl Event<'_> {
     #[inline]
     pub fn is_complete(&self) -> bool {
-        use crate::bindings::{cuEventQuery, cudaError_enum as R};
+        use crate::bindings::{cuEventQuery, cudaError_enum as E};
         match unsafe { cuEventQuery(self.0.rss) } {
-            R::CUDA_SUCCESS => true,
-            R::CUDA_ERROR_NOT_READY => false,
+            E::CUDA_SUCCESS => true,
+            E::CUDA_ERROR_NOT_READY => false,
             err => panic!("Unexpected error: {err:?}"),
         }
     }
@@ -71,7 +71,7 @@ impl Event<'_> {
 
     #[inline]
     pub fn elapse_from(&self, start: &Self) -> Duration {
-        let mut ms = 0.0;
+        let mut ms = 0.;
         driver!(cuEventElapsedTime(&mut ms, start.0.rss, self.0.rss));
         Duration::from_secs_f32(ms * 1e-3)
     }

@@ -17,7 +17,7 @@ impl CurrentCtx {
 impl Drop for Module<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuModuleUnload(self.0.rss));
+        driver!(cuModuleUnload(self.0.rss))
     }
 }
 
