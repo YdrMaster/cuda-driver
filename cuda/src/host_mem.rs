@@ -1,4 +1,4 @@
-﻿use crate::{Blob, CurrentCtx};
+use crate::{Blob, CurrentCtx};
 use context_spore::{AsRaw, impl_spore};
 use std::{
     alloc::Layout,
