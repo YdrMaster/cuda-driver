@@ -150,7 +150,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
         unimplemented!()
     };
 
-    options.push(include_dir(toolkit.display()));
+    options.push(include_dir(toolkit.join("include").display()));
     options
 }
 #[allow(dead_code)]

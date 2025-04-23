@@ -23,7 +23,7 @@ impl CurrentCtx {
 impl Drop for HostMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuMemFreeHost(self.0.rss.ptr));
+        driver!(cuMemFreeHost(self.0.rss.ptr))
     }
 }
 
