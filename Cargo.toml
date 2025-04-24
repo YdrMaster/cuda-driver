@@ -1,5 +1,12 @@
 [workspace]
-members = ["cuda", "cublas", "nccl", "search-cuda-tools", "search-corex-tools"]
+members = [
+    "cuda",
+    "cublas",
+    "nccl",
+    "search-cuda-tools",
+    "search-corex-tools",
+    "example",
+]
 resolver = "3"
 package.edition = "2024"
 
