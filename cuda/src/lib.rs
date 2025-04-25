@@ -67,7 +67,7 @@ pub use context_spore::{AsRaw, ContextResource, ContextSpore, RawContainer, impl
 pub use dev_mem::{DevByte, DevMem, DevMemSpore, memcpy_d2d, memcpy_d2h, memcpy_h2d};
 pub use device::{BlockLimit, Device, SMLimit};
 pub use event::{Event, EventSpore};
-pub use graph::{CaptureStream, Graph, GraphNode, GraphSpore};
+pub use graph::{CaptureStream, Graph, GraphNode};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use stream::{Stream, StreamSpore};
