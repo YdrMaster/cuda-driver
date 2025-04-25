@@ -153,6 +153,11 @@ impl VirMem {
 
         MappedMem { vir: self, phy }
     }
+
+    pub fn map_on(self, dev: &Device) -> MappedMem {
+        let len = self.len;
+        self.map(dev.mem_prop().create(len))
+    }
 }
 
 impl Drop for MappedMem {
