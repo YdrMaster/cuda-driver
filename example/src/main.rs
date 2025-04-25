@@ -4,20 +4,20 @@ mod loader;
 mod nn;
 
 use blob::Blob;
-use cuda::Device;
+use cuda::{Device, driver};
 use gguf::{GGufModel, GGufTensor, map_files};
 use ggus::{GGufMetaMapExt, ggml_quants::digit_layout::types};
-use loader::{WeightLoader, WeightMemCalculator};
-use nn::{
-    Attention, Embedding, Ffn, Linear, LinearResidual, Llama, RmsNorm, RoPE, SelfAttn, SwiGLU,
-    TransformerBlk,
-};
+use loader::{MemCalculator, WeightLoader};
+use nn::llama::Meta;
 use std::{
     collections::{BTreeMap, HashMap},
-    marker::PhantomData,
     ops::Range,
+    ptr::{null, null_mut},
 };
 use tensor::Tensor;
+
+pub use nn::*;
+const ALIGN: usize = 512;
 
 fn main() {
     if !cuda::init().is_ok() {
@@ -30,57 +30,32 @@ fn main() {
     insert_sin_cos(&mut gguf);
 
     let nblk = meta![gguf => llm_block_count];
-    let llama = Llama::<String> {
-        embedding: Embedding {
+    let llama = llama::Weight::<String> {
+        embedding: embedding::Weight {
             token_embd: "token_embd.weight".into(),
         },
         blks: (0..nblk)
-            .map(|iblk| TransformerBlk {
-                attn_norm: RmsNorm {
-                    weight: format!("blk.{iblk}.attn_norm.weight"),
+            .map(|iblk| transformer::Weight {
+                attn_norm: normalization::Weight::rms_norm(format!("blk.{iblk}.attn_norm.weight")),
+                attn: self_attn::Weight {
+                    qkv: linear::Weight::new(format!("blk.{iblk}.attn_qkv.weight"), None),
+                    rope: rope::Weight::new("sin_table".into(), "cos_table".into()),
+                    output: linear::Weight::new(format!("blk.{iblk}.attn_output.weight"), None),
                 },
-                attn: SelfAttn {
-                    qkv: Linear {
-                        weight: format!("blk.{iblk}.attn_qkv.weight"),
-                    },
-                    q_rope: RoPE {
-                        sin: "sin_table".into(),
-                        cos: "cos_table".into(),
-                    },
-                    k_rope: RoPE {
-                        sin: "sin_table".into(),
-                        cos: "cos_table".into(),
-                    },
-                    attn: Attention(PhantomData),
-                    output: LinearResidual {
-                        weight: format!("blk.{iblk}.attn_output.weight"),
-                    },
-                },
-                ffn_norm: RmsNorm {
-                    weight: format!("blk.{iblk}.ffn_norm.weight"),
-                },
-                ffn: Ffn {
-                    up: Linear {
-                        weight: format!("blk.{iblk}.ffn_gate_up.weight"),
-                    },
-                    act: SwiGLU(PhantomData),
-                    down: LinearResidual {
-                        weight: format!("blk.{iblk}.ffn_down.weight"),
-                    },
+                ffn_norm: normalization::Weight::rms_norm(format!("blk.{iblk}.ffn_norm.weight")),
+                ffn: ffn::Weight {
+                    up: linear::Weight::new(format!("blk.{iblk}.ffn_gate_up.weight"), None),
+                    down: linear::Weight::new(format!("blk.{iblk}.ffn_down.weight"), None),
                 },
             })
             .collect(),
-        output_norm: RmsNorm {
-            weight: "output_norm.weight".into(),
-        },
-        lm_head: Linear {
-            weight: "output.weight".into(),
-        },
+        output_norm: normalization::Weight::rms_norm(format!("output_norm.weight")),
+        lm_head: linear::Weight::new("output.weight".into(), None),
     }
     .map(|name| &gguf.tensors[&*name]);
 
     let mut weights = HashMap::<*const u8, Range<usize>>::new();
-    let mut calculator = WeightMemCalculator::new(512);
+    let mut calculator = MemCalculator::new(ALIGN);
     let mut sizes = BTreeMap::<usize, usize>::new();
     let _ = llama.as_ref().map(|t| {
         let ptr = t.data.as_ptr();
@@ -108,7 +83,7 @@ fn main() {
         let mut weight_memory = ctx.malloc::<u8>(calculator.size());
 
         let stream = ctx.stream();
-        let _llama = llama
+        let weights = llama
             .map(|t| {
                 let range = weights[&t.data.as_ptr()].clone();
                 let dev = &mut weight_memory[range.clone()];
@@ -116,11 +91,10 @@ fn main() {
                 Tensor::<usize, 4>::from_dim_slice(t.ty, &t.shape).map(|_| range)
             })
             .map(|t| t.map(|range| &weight_memory[range]));
-        stream.synchronize();
     })
 }
 
-// 构造 sin cos 表张量，存储到 GGufModel 中
+/// 构造 sin cos 表张量，存储到 GGufModel 中
 fn insert_sin_cos(gguf: &mut GGufModel) {
     let nctx = meta![gguf => llm_context_length];
     let d = meta![gguf => llm_embedding_length];
@@ -166,6 +140,25 @@ fn insert_sin_cos(gguf: &mut GGufModel) {
     };
     insert("sin_table", sin);
     insert("cos_table", cos);
+}
+
+fn build_workspace(gguf: &GGufModel, n: usize) -> llama::Workspace {
+    let d = meta![gguf => llm_embedding_length];
+    let nh = meta![gguf => llm_attention_head_count];
+    let nkvh = meta![gguf => llm_attention_head_count_kv; nh];
+    let dh = meta![gguf => llm_rope_dimension_count; d / nh];
+    let di = meta![gguf => llm_feed_forward_length] * 2;
+    Meta {
+        t_tok: types::U32,
+        t_pos: types::U32,
+        t_embd: types::F32,
+        d,
+        nh,
+        nkvh,
+        dh,
+        di,
+    }
+    .workspace(n, ALIGN)
 }
 
 #[test]

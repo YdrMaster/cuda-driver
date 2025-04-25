@@ -1,22 +1,22 @@
-﻿use super::NeuralNetwork;
-
-pub struct RoPE<T> {
-    pub sin: T,
-    pub cos: T,
+﻿pub struct Weight<T> {
+    sin: T,
+    cos: T,
 }
 
-impl<T> NeuralNetwork<T> for RoPE<T> {}
+impl<T> Weight<T> {
+    pub fn new(sin: T, cos: T) -> Self {
+        Self { sin, cos }
+    }
 
-impl<T> RoPE<T> {
-    pub fn map<U>(self, mut f: impl FnMut(T) -> U) -> RoPE<U> {
-        RoPE {
+    pub fn map<U>(self, mut f: impl FnMut(T) -> U) -> Weight<U> {
+        Weight {
             sin: f(self.sin),
             cos: f(self.cos),
         }
     }
 
-    pub fn as_ref(&self) -> RoPE<&T> {
-        RoPE {
+    pub fn as_ref(&self) -> Weight<&T> {
+        Weight {
             sin: &self.sin,
             cos: &self.cos,
         }

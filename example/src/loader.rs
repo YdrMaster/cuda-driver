@@ -6,12 +6,12 @@ use std::{
     ops::Range,
 };
 
-pub struct WeightMemCalculator {
+pub struct MemCalculator {
     align: usize,
     size: usize,
 }
 
-impl WeightMemCalculator {
+impl MemCalculator {
     #[inline]
     pub const fn new(align: usize) -> Self {
         Self { align, size: 0 }

@@ -1,21 +1,24 @@
-﻿use super::NeuralNetwork;
-
-pub struct Linear<T> {
-    pub weight: T,
+﻿pub struct Weight<T> {
+    weight: T,
+    bias: Option<T>,
 }
 
-impl<T> NeuralNetwork<T> for Linear<T> {}
+impl<T> Weight<T> {
+    pub fn new(weight: T, bias: Option<T>) -> Self {
+        Self { weight, bias }
+    }
 
-impl<T> Linear<T> {
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Linear<U> {
-        Linear {
+    pub fn map<U>(self, mut f: impl FnMut(T) -> U) -> Weight<U> {
+        Weight {
             weight: f(self.weight),
+            bias: self.bias.map(f),
         }
     }
 
-    pub fn as_ref(&self) -> Linear<&T> {
-        Linear {
+    pub fn as_ref(&self) -> Weight<&T> {
+        Weight {
             weight: &self.weight,
+            bias: self.bias.as_ref(),
         }
     }
 }

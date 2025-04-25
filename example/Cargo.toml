@@ -10,3 +10,4 @@ cublas.path = "../cublas"
 memmap2 = "0.9"
 ggus = { git = "https://github.com/InfiniTensor/gguf", rev = "23c362f" }
 tensor = { git = "https://github.com/YdrMaster/tensor", rev = "66450a9" }
+rwrc = { git = "https://github.com/YdrMaster/rwrc", rev = "3969558" }
