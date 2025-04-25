@@ -94,7 +94,7 @@ impl<'a> GGufModel<'a> {
                     let t = t.to_info();
                     vacant.insert(GGufTensor {
                         ty: t.ty().to_digit_layout(),
-                        shape: t.shape().iter().map(|&x| x as usize).collect(),
+                        shape: t.shape().iter().rev().map(|&x| x as usize).collect(),
                         data: gguf.data[t.offset()..][..t.nbytes()].into(),
                     });
                 }

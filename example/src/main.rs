@@ -4,13 +4,14 @@ mod loader;
 mod nn;
 
 use blob::Blob;
-use cuda::{Device, VirMem};
+use cuda::{Device, Graph, VirMem, memcpy_d2h, memcpy_h2d};
 use gguf::{GGufModel, GGufTensor, map_files};
 use ggus::{GGufMetaMapExt, ggml_quants::digit_layout::types};
 use loader::{MemCalculator, WeightLoader};
 use nn::llama::Meta;
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt,
     ops::Range,
 };
 use tensor::Tensor;
@@ -18,6 +19,7 @@ use tensor::Tensor;
 pub use nn::*;
 const ALIGN: usize = 512;
 
+// cargo run --release -- ../TinyStory-5M-v0.0-F32.gguf
 fn main() {
     if !cuda::init().is_ok() {
         return;
@@ -77,16 +79,16 @@ fn main() {
     let page_size = prop.granularity_minimum();
 
     let meta = build_llama_meta(&gguf);
-    let workspace = meta.workspace(1, ALIGN);
-    println!("size = {}", workspace.size);
+    let workspace = meta.workspace::<2>(5, ALIGN);
+    println!("size = {}", workspace.item);
 
-    let workspace = VirMem::new(workspace.size.div_ceil(page_size) * page_size);
-    println!("workspace.len = {}", workspace.len());
+    let workspace = workspace.map(|len| VirMem::new(len.div_ceil(page_size) * page_size, 0));
+    println!("workspace.len = {}", workspace.item.len());
 
-    let kv_cache = meta.kv_cache(4096).take();
+    let kv_cache = meta.kv_cache::<2>(4096).take();
     println!("kv cache = {kv_cache}");
 
-    let kv_cache = VirMem::new(kv_cache.div_ceil(page_size) * page_size);
+    let kv_cache = VirMem::new(kv_cache.div_ceil(page_size) * page_size, 0);
     println!("kv cache = {}", kv_cache.len());
 
     Device::new(0).context().apply(|ctx| {
@@ -104,9 +106,30 @@ fn main() {
                 let range = weights[&t.data.as_ptr()].clone();
                 let dev = &mut weight_memory[range.clone()];
                 loader.load(dev, &t.data, &stream);
-                Tensor::<usize, 4>::from_dim_slice(t.ty, &t.shape).map(|_| range)
+                Tensor::<usize, 2>::from_dim_slice(t.ty, &t.shape).map(|_| range)
             })
             .map(|t| t.map(|range| &weight_memory[range]));
+
+        let graph = Graph::new();
+        let mut modules = Modules::new(ctx);
+        weights.add_to_graph(&graph, &mut modules, &workspace);
+
+        let mut workspace = workspace.map(|vir| vir.map_on(&dev));
+        let tokens = workspace.tokens.get().clone();
+        memcpy_h2d(
+            &mut workspace.item[tokens],
+            &[4612u32, 2619, 260, 647, 31844],
+        );
+
+        ctx.instantiate(&graph).launch(&stream);
+        stream.synchronize();
+
+        let x = workspace.x.clone().map(|range| {
+            let mut host = vec![0u8; range.len()];
+            memcpy_d2h(&mut host, &workspace.item[range]);
+            host
+        });
+        println!("{}", Fmt(x.as_deref()))
     })
 }
 
@@ -227,7 +250,7 @@ fn test_behavior() {
         ));
 
         let graph = stream.end();
-        let exec = graph.instantiate();
+        let exec = ctx.instantiate(&graph);
 
         let stream = ctx.stream();
         exec.launch(&stream);
@@ -236,6 +259,44 @@ fn test_behavior() {
         stream.synchronize();
         memcpy_d2h(&mut host, &c);
 
-        println!("{host:?}");
+        println!("{host:?}")
     })
+}
+
+struct Fmt<'a, const N: usize>(Tensor<&'a [u8], N>);
+
+impl<const N: usize> fmt::Display for Fmt<'_, N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let layout = self.0.layout();
+        let ptr = self.0.get().as_ptr();
+        match self.0.dt() {
+            types::F32 => unsafe { layout.write_array(f, ptr.cast::<DataFmt<f32>>()) },
+            types::U32 => unsafe { layout.write_array(f, ptr.cast::<DataFmt<u32>>()) },
+            _ => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct DataFmt<T>(T);
+
+impl fmt::Display for DataFmt<f32> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.0 == 0. {
+            write!(f, " ________")
+        } else {
+            write!(f, "{:>9.3e}", self.0)
+        }
+    }
+}
+
+impl fmt::Display for DataFmt<u32> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.0 == 0 {
+            write!(f, " ________")
+        } else {
+            write!(f, "{:>6}", self.0)
+        }
+    }
 }

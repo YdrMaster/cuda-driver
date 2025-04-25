@@ -65,7 +65,7 @@ impl<'ctx> WeightLoader<'ctx> {
         if self.no_reuse.contains(&size) {
             // 不使用分配器，先出队后同步等待
             self.free_complete();
-            stream.synchronize()
+            stream.synchronize();
         } else {
             // 使用分配器，先入队再出队
             self.queue.push_back((stream.record(), host));
