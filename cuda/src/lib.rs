@@ -71,7 +71,7 @@ pub use graph::{CaptureStream, Graph, GraphNode, GraphSpore};
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{AsParam, KernelFn, Module, ModuleSpore, Ptx, Symbol};
 pub use stream::{Stream, StreamSpore};
-pub use virtual_mem::{MappedMem, MemProp, PhyMem, VirMem};
+pub use virtual_mem::{MappedMem, MemProp, PhyMem, VirByte, VirMem};
 
 use std::{
     cmp::Ordering,

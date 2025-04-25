@@ -9,6 +9,7 @@ use context_spore::AsRaw;
 use std::{
     ops::{Deref, DerefMut},
     ptr::null_mut,
+    slice::{from_raw_parts, from_raw_parts_mut},
     sync::Arc,
 };
 
@@ -57,6 +58,9 @@ impl MemProp {
     }
 }
 
+#[repr(transparent)]
+pub struct VirByte(u8);
+
 pub struct VirMem {
     ptr: CUdeviceptr,
     len: usize,
@@ -74,6 +78,20 @@ impl Drop for VirMem {
     fn drop(&mut self) {
         let &mut Self { ptr, len } = self;
         driver!(cuMemAddressFree(ptr, len))
+    }
+}
+
+impl Deref for VirMem {
+    type Target = [VirByte];
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { from_raw_parts(self.ptr as _, self.len) }
+    }
+}
+
+impl DerefMut for VirMem {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
     }
 }
 
@@ -99,6 +117,18 @@ impl Drop for PhyMem {
     fn drop(&mut self) {
         let &mut Self { handle, .. } = self;
         driver!(cuMemRelease(handle))
+    }
+}
+
+impl PhyMem {
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 
@@ -145,14 +175,14 @@ impl Deref for MappedMem {
     type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { std::slice::from_raw_parts(self.vir.ptr as _, self.phy.len) }
+        unsafe { from_raw_parts(self.vir.ptr as _, self.phy.len) }
     }
 }
 
 impl DerefMut for MappedMem {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { std::slice::from_raw_parts_mut(self.vir.ptr as _, self.phy.len) }
+        unsafe { from_raw_parts_mut(self.vir.ptr as _, self.phy.len) }
     }
 }
 
