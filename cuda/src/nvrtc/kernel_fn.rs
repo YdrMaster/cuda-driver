@@ -4,7 +4,6 @@
         CUfunction,
         CUfunction_attribute::{self, *},
     },
-    graph::KernelNode,
 };
 use context_spore::AsRaw;
 use std::{
@@ -28,13 +27,6 @@ impl Module<'_> {
             name.as_ptr().cast(),
         ));
         KernelFn(kernel, PhantomData)
-    }
-}
-
-impl KernelNode<'_> {
-    pub fn get_kernel(&self) -> KernelFn {
-        let params = self.get_params();
-        KernelFn(params.func, PhantomData)
     }
 }
 
