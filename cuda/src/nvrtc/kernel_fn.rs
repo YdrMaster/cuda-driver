@@ -41,22 +41,21 @@ impl AsRaw for KernelFn<'_> {
 impl KernelFn<'_> {
     pub fn launch(
         &self,
-        grid_dims: impl Into<Dim3>,
-        block_dims: impl Into<Dim3>,
+        attributes: (impl Into<Dim3>, impl Into<Dim3>, usize),
         params: *const *const c_void,
-        shared_mem: usize,
         stream: Option<&Stream>,
     ) {
-        let grid_dims = grid_dims.into();
-        let block_dims = block_dims.into();
+        let (grid, block, shared_mem) = attributes;
+        let grid = grid.into();
+        let block = block.into();
         driver!(cuLaunchKernel(
             self.0,
-            grid_dims.x,
-            grid_dims.y,
-            grid_dims.z,
-            block_dims.x,
-            block_dims.y,
-            block_dims.z,
+            grid.x,
+            grid.y,
+            grid.z,
+            block.x,
+            block.y,
+            block.z,
             shared_mem as _,
             stream.map_or(null_mut(), |x| x.as_raw()),
             params as _,

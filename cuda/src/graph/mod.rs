@@ -132,6 +132,14 @@ macro_rules! typed_node {
         $(
             #[repr(transparent)]
             pub struct $name<'g>(CUgraphNode, PhantomData<&'g ()>);
+
+            impl AsRaw for $name<'_> {
+                type Raw = CUgraphNode;
+                #[inline]
+                unsafe fn as_raw(&self) -> Self::Raw {
+                    self.0
+                }
+            }
         )+
     };
 }
@@ -175,6 +183,35 @@ impl GraphNode<'_> {
             _ => todo!(),
         };
         ans
+    }
+}
+
+impl AsRaw for GraphNode<'_> {
+    type Raw = CUgraphNode;
+    #[inline]
+    unsafe fn as_raw(&self) -> Self::Raw {
+        macro_rules! case {
+            ( $( $variant:ident )+ ) => {
+                match self {
+                    $(GraphNode::$variant(node) => unsafe { node.as_raw() },)+
+                }
+            };
+        }
+
+        case! {
+            Kernel
+            MemAlloc
+            MemFree
+            Memcpy
+            Memset
+            HostFn
+            SubGraph
+            Empty
+            EventWait
+            EventRecord
+            ExtSemasSignal
+            ExtSemasWait
+        }
     }
 }
 
@@ -251,24 +288,18 @@ extern "C" __global__ void mul(float *a, float const *b) {
                 let mut d = stream.from_host(&d_host);
 
                 add.launch(
-                    1,
-                    1024,
+                    (1, 1024, 0),
                     params![a.as_mut_ptr(), b.as_mut_ptr()].as_ptr(),
-                    0,
                     Some(&stream),
                 );
                 sub.launch(
-                    1,
-                    1024,
+                    (1, 1024, 0),
                     params![c.as_mut_ptr(), d.as_mut_ptr()].as_ptr(),
-                    0,
                     Some(&stream),
                 );
                 mul.launch(
-                    1,
-                    1024,
+                    (1, 1024, 0),
                     params![a.as_mut_ptr(), c.as_mut_ptr()].as_ptr(),
-                    0,
                     Some(&stream),
                 );
                 driver!(cuMemcpyDtoHAsync_v2(
@@ -306,7 +337,7 @@ extern "C" __global__ void mul(float *a, float const *b) {
 
             let stream = ctx.stream().capture();
             // cuda graph 会将 kernel 用到的参数拷贝保存在节点中
-            kernel.launch((), (), params![10].as_ptr(), 0, Some(&stream));
+            kernel.launch(((), (), 0), params![10].as_ptr(), Some(&stream));
             let graph = stream.end();
             let stream = ctx.stream();
 
