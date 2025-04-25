@@ -4,7 +4,7 @@ mod loader;
 mod nn;
 
 use blob::Blob;
-use cuda::{Device, driver};
+use cuda::{Device, VirMem};
 use gguf::{GGufModel, GGufTensor, map_files};
 use ggus::{GGufMetaMapExt, ggml_quants::digit_layout::types};
 use loader::{MemCalculator, WeightLoader};
@@ -12,7 +12,6 @@ use nn::llama::Meta;
 use std::{
     collections::{BTreeMap, HashMap},
     ops::Range,
-    ptr::{null, null_mut},
 };
 use tensor::Tensor;
 
@@ -72,6 +71,23 @@ fn main() {
             }
         }
     });
+
+    let dev = Device::new(0);
+    let prop = dev.mem_prop();
+    let page_size = prop.granularity_minimum();
+
+    let meta = build_llama_meta(&gguf);
+    let workspace = meta.workspace(1, ALIGN);
+    println!("size = {}", workspace.size);
+
+    let workspace = VirMem::new(workspace.size.div_ceil(page_size) * page_size);
+    println!("workspace.len = {}", workspace.len());
+
+    let kv_cache = meta.kv_cache(4096).take();
+    println!("kv cache = {kv_cache}");
+
+    let kv_cache = VirMem::new(kv_cache.div_ceil(page_size) * page_size);
+    println!("kv cache = {}", kv_cache.len());
 
     Device::new(0).context().apply(|ctx| {
         let mut loader = WeightLoader::new(
@@ -142,7 +158,8 @@ fn insert_sin_cos(gguf: &mut GGufModel) {
     insert("cos_table", cos);
 }
 
-fn build_workspace(gguf: &GGufModel, n: usize) -> llama::Workspace {
+fn build_llama_meta(gguf: &GGufModel) -> llama::Meta {
+    let nblk = meta![gguf => llm_block_count];
     let d = meta![gguf => llm_embedding_length];
     let nh = meta![gguf => llm_attention_head_count];
     let nkvh = meta![gguf => llm_attention_head_count_kv; nh];
@@ -152,13 +169,13 @@ fn build_workspace(gguf: &GGufModel, n: usize) -> llama::Workspace {
         t_tok: types::U32,
         t_pos: types::U32,
         t_embd: types::F32,
+        nblk,
         d,
         nh,
         nkvh,
         dh,
         di,
     }
-    .workspace(n, ALIGN)
 }
 
 #[test]

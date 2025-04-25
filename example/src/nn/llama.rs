@@ -35,6 +35,7 @@ pub struct Meta {
     pub t_tok: DigitLayout,
     pub t_pos: DigitLayout,
     pub t_embd: DigitLayout,
+    pub nblk: usize,
     pub d: usize,
     pub nh: usize,
     pub nkvh: usize,
@@ -72,6 +73,17 @@ impl Meta {
     pub fn ffn(&self, n: usize) -> Tensor<usize, 2> {
         let &Self { t_embd, di, .. } = self;
         Tensor::from_dim_slice(t_embd, &[n, di])
+    }
+
+    pub fn kv_cache(&self, n: usize) -> Tensor<usize, 2> {
+        let &Self {
+            t_embd,
+            nblk,
+            nkvh,
+            dh,
+            ..
+        } = self;
+        Tensor::from_dim_slice(t_embd, &[n, nblk, 2, nkvh, dh])
     }
 
     pub fn workspace(&self, n: usize, align: usize) -> Workspace {
