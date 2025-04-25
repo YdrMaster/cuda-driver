@@ -1,8 +1,9 @@
 ﻿use crate::{
     DevByte, Device,
     bindings::{
-        CUdeviceptr, CUmemAccess_flags, CUmemAccessDesc, CUmemAllocationProp,
-        CUmemGenericAllocationHandle, CUmemLocation,
+        CUdeviceptr, CUmemAccess_flags, CUmemAccessDesc, CUmemAllocationGranularity_flags,
+        CUmemAllocationHandleType, CUmemAllocationProp, CUmemAllocationType,
+        CUmemGenericAllocationHandle, CUmemLocation, CUmemLocationType,
     },
 };
 use context_spore::AsRaw;
@@ -19,10 +20,6 @@ pub struct MemProp(CUmemAllocationProp);
 
 impl Device {
     pub fn mem_prop(&self) -> MemProp {
-        use crate::bindings::{
-            CUmemAllocationHandleType, CUmemAllocationProp, CUmemAllocationType, CUmemLocation,
-            CUmemLocationType,
-        };
         MemProp(CUmemAllocationProp {
             type_: CUmemAllocationType::CU_MEM_ALLOCATION_TYPE_PINNED,
             requestedHandleTypes: CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_NONE,
@@ -37,23 +34,19 @@ impl Device {
 }
 
 impl MemProp {
+    #[inline]
     pub fn granularity_minimum(&self) -> usize {
-        let mut size = 0;
-        driver!(cuMemGetAllocationGranularity(
-            &mut size,
-            &self.0,
-            CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_MINIMUM
-        ));
-        size
+        self.granularity(CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_MINIMUM)
     }
 
+    #[inline]
     pub fn granularity_recommended(&self) -> usize {
+        self.granularity(CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_RECOMMENDED)
+    }
+
+    fn granularity(&self, type_: CUmemAllocationGranularity_flags) -> usize {
         let mut size = 0;
-        driver!(cuMemGetAllocationGranularity(
-            &mut size,
-            &self.0,
-            CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_RECOMMENDED
-        ));
+        driver!(cuMemGetAllocationGranularity(&mut size, &self.0, type_));
         size
     }
 }
@@ -227,4 +220,17 @@ fn test_behavior() {
     dev.context().apply(|_| memcpy_d2h(&mut host_, &mapped));
 
     assert_eq!(&*host, &*host_)
+}
+
+#[test]
+fn test_reserve_many() {
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
+    let minimum = Device::new(0).mem_prop().granularity_minimum();
+    let pages = (0..1024).map(|_| VirMem::new(minimum)).collect::<Box<_>>();
+    for vir in pages.windows(2) {
+        let [a, b] = vir else { unreachable!() };
+        assert_eq!(a.as_ptr_range().end, b.as_ptr())
+    }
 }
