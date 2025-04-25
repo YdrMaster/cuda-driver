@@ -1,0 +1,195 @@
+﻿use crate::{
+    DevByte, Device,
+    bindings::{
+        CUdeviceptr, CUmemAccess_flags, CUmemAccessDesc, CUmemAllocationProp,
+        CUmemGenericAllocationHandle, CUmemLocation,
+    },
+};
+use context_spore::AsRaw;
+use std::{
+    ops::{Deref, DerefMut},
+    ptr::null_mut,
+    sync::Arc,
+};
+
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct MemProp(CUmemAllocationProp);
+
+impl Device {
+    pub fn mem_prop(&self) -> MemProp {
+        use crate::bindings::{
+            CUmemAllocationHandleType, CUmemAllocationProp, CUmemAllocationType, CUmemLocation,
+            CUmemLocationType,
+        };
+        MemProp(CUmemAllocationProp {
+            type_: CUmemAllocationType::CU_MEM_ALLOCATION_TYPE_PINNED,
+            requestedHandleTypes: CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_NONE,
+            location: CUmemLocation {
+                type_: CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE,
+                id: unsafe { self.as_raw() },
+            },
+            win32HandleMetaData: null_mut(),
+            allocFlags: unsafe { std::mem::zeroed() },
+        })
+    }
+}
+
+impl MemProp {
+    pub fn granularity_minimum(&self) -> usize {
+        let mut size = 0;
+        driver!(cuMemGetAllocationGranularity(
+            &mut size,
+            &self.0,
+            CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_MINIMUM
+        ));
+        size
+    }
+
+    pub fn granularity_recommended(&self) -> usize {
+        let mut size = 0;
+        driver!(cuMemGetAllocationGranularity(
+            &mut size,
+            &self.0,
+            CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_RECOMMENDED
+        ));
+        size
+    }
+}
+
+pub struct VirMem {
+    ptr: CUdeviceptr,
+    len: usize,
+}
+
+impl VirMem {
+    pub fn new(len: usize) -> Self {
+        let mut ptr = 0;
+        driver!(cuMemAddressReserve(&mut ptr, len, 0, 0, 0));
+        Self { ptr, len }
+    }
+}
+
+impl Drop for VirMem {
+    fn drop(&mut self) {
+        let &mut Self { ptr, len } = self;
+        driver!(cuMemAddressFree(ptr, len))
+    }
+}
+
+pub struct PhyMem {
+    location: CUmemLocation,
+    handle: CUmemGenericAllocationHandle,
+    len: usize,
+}
+
+impl MemProp {
+    pub fn create(&self, len: usize) -> Arc<PhyMem> {
+        let mut handle = 0;
+        driver!(cuMemCreate(&mut handle, len, &self.0, 0));
+        Arc::new(PhyMem {
+            location: self.0.location,
+            handle,
+            len,
+        })
+    }
+}
+
+impl Drop for PhyMem {
+    fn drop(&mut self) {
+        let &mut Self { handle, .. } = self;
+        driver!(cuMemRelease(handle))
+    }
+}
+
+pub struct MappedMem {
+    vir: VirMem,
+    phy: Arc<PhyMem>,
+}
+
+impl VirMem {
+    pub fn map(self, phy: Arc<PhyMem>) -> MappedMem {
+        debug_assert!(
+            self.len >= phy.len,
+            "cannot map physical memory to a smaller address region"
+        );
+        driver!(cuMemMap(self.ptr, phy.len, 0, phy.handle, 0));
+
+        let desc = CUmemAccessDesc {
+            location: phy.location,
+            flags: CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE,
+        };
+        driver!(cuMemSetAccess(self.ptr, phy.len, &desc, 1));
+
+        MappedMem { vir: self, phy }
+    }
+}
+
+impl Drop for MappedMem {
+    fn drop(&mut self) {
+        driver!(cuMemUnmap(self.vir.ptr, self.phy.len))
+    }
+}
+
+impl MappedMem {
+    pub fn unmap(self) -> (VirMem, Arc<PhyMem>) {
+        let vir = VirMem {
+            ptr: self.vir.ptr,
+            len: self.vir.len,
+        };
+        (vir, self.phy.clone())
+    }
+}
+
+impl Deref for MappedMem {
+    type Target = [DevByte];
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        unsafe { std::slice::from_raw_parts(self.vir.ptr as _, self.phy.len) }
+    }
+}
+
+impl DerefMut for MappedMem {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { std::slice::from_raw_parts_mut(self.vir.ptr as _, self.phy.len) }
+    }
+}
+
+#[test]
+fn test_behavior() {
+    use crate::{Device, memcpy_d2h, memcpy_h2d, virtual_mem::VirMem};
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
+    let dev = Device::new(0);
+
+    let prop = dev.mem_prop();
+    let minimum = prop.granularity_minimum();
+    let recommended = prop.granularity_recommended();
+    println!("minimun = {minimum}, recommended = {recommended}");
+
+    // 分配一个较大的虚地址区域
+    let virmem = VirMem::new(10 * minimum);
+    // 分配一个较小的物理页
+    let phymem = prop.create(minimum);
+    // 建立映射
+    let mut mapped = virmem.map(phymem.clone());
+
+    // 通过虚地址操作存储空间
+    let host = (0..minimum / size_of::<usize>())
+        .map(|i| i)
+        .collect::<Box<_>>();
+    // 对存储空间的操作仍然需要在上下文中进行
+    dev.context().apply(|_| memcpy_h2d(&mut mapped, &host));
+
+    // 分配另一个虚地址区域
+    let virmem = VirMem::new(2 * minimum);
+    // 将同一个物理页映射到虚地址区域
+    let mapped = virmem.map(phymem);
+    // 在另一个上下文中读取存储空间
+    let mut host_ = vec![0usize; host.len()];
+    dev.context().apply(|_| memcpy_d2h(&mut host_, &mapped));
+
+    assert_eq!(&*host, &*host_)
+}

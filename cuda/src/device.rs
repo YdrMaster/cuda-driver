@@ -60,6 +60,13 @@ impl Device {
     }
 
     #[inline]
+    pub fn vm_supported(&self) -> bool {
+        self.get_attribute(
+            CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED,
+        ) != 0
+    }
+
+    #[inline]
     pub fn alignment(&self) -> usize {
         self.get_attribute(CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT) as _
     }
@@ -168,6 +175,7 @@ impl fmt::Display for InfoFmt<'_> {
             "\
 GPU{} ({})
   cc = {}
+  vm supported = {}
   gmem = {}
   alignment = {}
   warp size = {}
@@ -185,6 +193,7 @@ GPU{} ({})
             self.0.0,
             self.0.name(),
             self.0.compute_capability(),
+            self.0.vm_supported(),
             self.0.total_memory(),
             self.0.alignment(),
             self.0.warp_size(),
