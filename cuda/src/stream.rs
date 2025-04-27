@@ -17,7 +17,7 @@ impl Drop for Stream<'_> {
     #[inline]
     fn drop(&mut self) {
         self.synchronize();
-        driver!(cuStreamDestroy_v2(self.0.rss));
+        driver!(cuStreamDestroy_v2(self.0.rss))
     }
 }
 
@@ -32,6 +32,6 @@ impl AsRaw for Stream<'_> {
 impl Stream<'_> {
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuStreamSynchronize(self.0.rss));
+        driver!(cuStreamSynchronize(self.0.rss))
     }
 }

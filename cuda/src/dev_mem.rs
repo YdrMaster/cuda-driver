@@ -37,11 +37,10 @@ impl Stream<'_> {
     #[inline]
     pub fn memcpy_h2d<T: Copy>(&self, dst: &mut [DevByte], src: &[T]) {
         let len = size_of_val(src);
-        let src = src.as_ptr().cast();
         assert_eq!(len, size_of_val(dst));
         driver!(cuMemcpyHtoDAsync_v2(
-            dst.as_ptr() as _,
-            src,
+            dst.as_mut_ptr() as _,
+            src.as_ptr().cast(),
             len,
             self.as_raw()
         ))
@@ -52,7 +51,19 @@ impl Stream<'_> {
         let len = size_of_val(src);
         assert_eq!(len, size_of_val(dst));
         driver!(cuMemcpyDtoDAsync_v2(
-            dst.as_ptr() as _,
+            dst.as_mut_ptr() as _,
+            src.as_ptr() as _,
+            len,
+            self.as_raw()
+        ))
+    }
+
+    #[inline]
+    pub fn memcpy_d2h<T: Copy>(&self, dst: &mut [T], src: &[DevByte]) {
+        let len = size_of_val(src);
+        assert_eq!(len, size_of_val(dst));
+        driver!(cuMemcpyDtoHAsync_v2(
+            dst.as_mut_ptr().cast(),
             src.as_ptr() as _,
             len,
             self.as_raw()
