@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Clone cccl when Toolkit version is below 12, otherwise, use build-in cccl;
+- Use `stream.launch(kernel, attrs, params)` to launch kernel on stream;
+- `stream.memcpy_h2d`, `stream.memcpy_d2h`, `stream.memcpy_d2d`, `stream.free` and `stream.launch` allow method chaining;
 
 ## [0.0.0]
 

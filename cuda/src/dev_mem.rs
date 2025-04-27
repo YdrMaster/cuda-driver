@@ -35,7 +35,7 @@ pub fn memcpy_d2d(dst: &mut [DevByte], src: &[DevByte]) {
 
 impl Stream<'_> {
     #[inline]
-    pub fn memcpy_h2d<T: Copy>(&self, dst: &mut [DevByte], src: &[T]) {
+    pub fn memcpy_h2d<T: Copy>(&self, dst: &mut [DevByte], src: &[T]) -> &Self {
         let len = size_of_val(src);
         assert_eq!(len, size_of_val(dst));
         driver!(cuMemcpyHtoDAsync_v2(
@@ -43,11 +43,12 @@ impl Stream<'_> {
             src.as_ptr().cast(),
             len,
             self.as_raw()
-        ))
+        ));
+        self
     }
 
     #[inline]
-    pub fn memcpy_d2d(&self, dst: &mut [DevByte], src: &[DevByte]) {
+    pub fn memcpy_d2d(&self, dst: &mut [DevByte], src: &[DevByte]) -> &Self {
         let len = size_of_val(src);
         assert_eq!(len, size_of_val(dst));
         driver!(cuMemcpyDtoDAsync_v2(
@@ -55,11 +56,12 @@ impl Stream<'_> {
             src.as_ptr() as _,
             len,
             self.as_raw()
-        ))
+        ));
+        self
     }
 
     #[inline]
-    pub fn memcpy_d2h<T: Copy>(&self, dst: &mut [T], src: &[DevByte]) {
+    pub fn memcpy_d2h<T: Copy>(&self, dst: &mut [T], src: &[DevByte]) -> &Self {
         let len = size_of_val(src);
         assert_eq!(len, size_of_val(dst));
         driver!(cuMemcpyDtoHAsync_v2(
@@ -67,7 +69,8 @@ impl Stream<'_> {
             src.as_ptr() as _,
             len,
             self.as_raw()
-        ))
+        ));
+        self
     }
 }
 
@@ -114,14 +117,12 @@ impl<'ctx> Stream<'ctx> {
             PhantomData,
         )
     }
-}
 
-#[cfg(nvidia)]
-impl DevMem<'_> {
-    #[inline]
-    pub fn drop_on(self, stream: &Stream) {
-        driver!(cuMemFreeAsync(self.0.rss.ptr, stream.as_raw()));
-        std::mem::forget(self)
+    #[cfg(nvidia)]
+    pub fn free(&self, mem: DevMem) -> &Self {
+        driver!(cuMemFreeAsync(mem.0.rss.ptr, self.as_raw()));
+        std::mem::forget(mem);
+        self
     }
 }
 

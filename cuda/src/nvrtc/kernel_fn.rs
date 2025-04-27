@@ -1,5 +1,5 @@
 ﻿use crate::{
-    Dim3, MemSize, Module, Stream, Version,
+    MemSize, Module, Version,
     bindings::{
         CUfunction,
         CUfunction_attribute::{self, *},
@@ -39,30 +39,6 @@ impl AsRaw for KernelFn<'_> {
 }
 
 impl KernelFn<'_> {
-    pub fn launch(
-        &self,
-        attributes: (impl Into<Dim3>, impl Into<Dim3>, usize),
-        params: *const *const c_void,
-        stream: Option<&Stream>,
-    ) {
-        let (grid, block, shared_mem) = attributes;
-        let grid = grid.into();
-        let block = block.into();
-        driver!(cuLaunchKernel(
-            self.0,
-            grid.x,
-            grid.y,
-            grid.z,
-            block.x,
-            block.y,
-            block.z,
-            shared_mem as _,
-            stream.map_or(null_mut(), |x| x.as_raw()),
-            params as _,
-            null_mut(),
-        ))
-    }
-
     #[inline]
     pub fn max_threads_per_block(&self) -> usize {
         self.get_attribute(CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK) as _

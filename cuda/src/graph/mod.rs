@@ -25,7 +25,7 @@ impl<'ctx> Stream<'ctx> {
     }
 }
 
-impl<'ctx> CaptureStream<'ctx> {
+impl CaptureStream<'_> {
     pub fn end(self) -> Graph {
         let mut graph = null_mut();
         driver!(cuStreamEndCapture(self.0.as_raw(), &mut graph));
@@ -46,6 +46,12 @@ impl Graph {
         let mut graph = null_mut();
         driver!(cuGraphCreate(&mut graph, 0));
         Self(graph)
+    }
+}
+
+impl Default for Graph {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -222,7 +228,7 @@ mod test {
     use std::{ffi::CString, ptr::null_mut, str::FromStr};
 
     #[test]
-    fn test_ctx() {
+    fn test_behavior() {
         if let Err(crate::NoDevice) = crate::init() {
             return;
         }
@@ -287,32 +293,27 @@ extern "C" __global__ void mul(float *a, float const *b) {
                 let mut c = stream.from_host(&c_host);
                 let mut d = stream.from_host(&d_host);
 
-                add.launch(
-                    (1, 1024, 0),
-                    params![a.as_mut_ptr(), b.as_mut_ptr()].as_ptr(),
-                    Some(&stream),
-                );
-                sub.launch(
-                    (1, 1024, 0),
-                    params![c.as_mut_ptr(), d.as_mut_ptr()].as_ptr(),
-                    Some(&stream),
-                );
-                mul.launch(
-                    (1, 1024, 0),
-                    params![a.as_mut_ptr(), c.as_mut_ptr()].as_ptr(),
-                    Some(&stream),
-                );
-                driver!(cuMemcpyDtoHAsync_v2(
-                    ans.as_mut_ptr().cast(),
-                    a.as_ptr() as _,
-                    4096,
-                    stream.as_raw()
-                ));
-
-                a.drop_on(&stream);
-                b.drop_on(&stream);
-                c.drop_on(&stream);
-                d.drop_on(&stream);
+                stream
+                    .launch(
+                        &add,
+                        (1, 1024, 0),
+                        params![a.as_mut_ptr(), b.as_mut_ptr()].as_ptr(),
+                    )
+                    .launch(
+                        &sub,
+                        (1, 1024, 0),
+                        params![c.as_mut_ptr(), d.as_mut_ptr()].as_ptr(),
+                    )
+                    .launch(
+                        &mul,
+                        (1, 1024, 0),
+                        params![a.as_mut_ptr(), c.as_mut_ptr()].as_ptr(),
+                    )
+                    .memcpy_d2h(&mut ans, &a)
+                    .free(a)
+                    .free(b)
+                    .free(c)
+                    .free(d);
             }
 
             stream
@@ -337,7 +338,7 @@ extern "C" __global__ void mul(float *a, float const *b) {
 
             let stream = ctx.stream().capture();
             // cuda graph 会将 kernel 用到的参数拷贝保存在节点中
-            kernel.launch(((), (), 0), params![10].as_ptr(), Some(&stream));
+            stream.launch(&kernel, ((), (), 0), params![10].as_ptr());
             let graph = stream.end();
             let stream = ctx.stream();
 

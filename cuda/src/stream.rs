@@ -1,6 +1,6 @@
-use crate::{CurrentCtx, bindings::CUstream};
+use crate::{CurrentCtx, Dim3, KernelFn, bindings::CUstream};
 use context_spore::{AsRaw, impl_spore};
-use std::{marker::PhantomData, ptr::null_mut};
+use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 impl_spore!(Stream and StreamSpore by (CurrentCtx, CUstream));
 
@@ -30,8 +30,34 @@ impl AsRaw for Stream<'_> {
 }
 
 impl Stream<'_> {
+    pub fn launch(
+        &self,
+        f: &KernelFn,
+        attributes: (impl Into<Dim3>, impl Into<Dim3>, usize),
+        params: *const *const c_void,
+    ) -> &Self {
+        let (grid, block, shared_mem) = attributes;
+        let grid = grid.into();
+        let block = block.into();
+        driver!(cuLaunchKernel(
+            f.as_raw(),
+            grid.x,
+            grid.y,
+            grid.z,
+            block.x,
+            block.y,
+            block.z,
+            shared_mem as _,
+            self.0.rss,
+            params as _,
+            null_mut(),
+        ));
+        self
+    }
+
     #[inline]
-    pub fn synchronize(&self) {
-        driver!(cuStreamSynchronize(self.0.rss))
+    pub fn synchronize(&self) -> &Self {
+        driver!(cuStreamSynchronize(self.0.rss));
+        self
     }
 }
