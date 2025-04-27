@@ -6,11 +6,11 @@ impl Graph {
     pub fn add_kernel_call(
         &self,
         f: &KernelFn,
-        attributes: (impl Into<Dim3>, impl Into<Dim3>, usize),
+        attrs: (impl Into<Dim3>, impl Into<Dim3>, usize),
         params: *const *const c_void,
         dependencies: &[GraphNode],
     ) -> KernelNode {
-        let (grid, block, shared_mem) = attributes;
+        let (grid, block, shared_mem) = attrs;
         let grid = grid.into();
         let block = block.into();
         let params = CUDA_KERNEL_NODE_PARAMS {

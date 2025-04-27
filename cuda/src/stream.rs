@@ -33,10 +33,10 @@ impl Stream<'_> {
     pub fn launch(
         &self,
         f: &KernelFn,
-        attributes: (impl Into<Dim3>, impl Into<Dim3>, usize),
+        attrs: (impl Into<Dim3>, impl Into<Dim3>, usize),
         params: *const *const c_void,
     ) -> &Self {
-        let (grid, block, shared_mem) = attributes;
+        let (grid, block, shared_mem) = attrs;
         let grid = grid.into();
         let block = block.into();
         driver!(cuLaunchKernel(
