@@ -60,9 +60,9 @@ pub struct VirMem {
 }
 
 impl VirMem {
-    pub fn new(len: usize) -> Self {
+    pub fn new(len: usize, min_addr: usize) -> Self {
         let mut ptr = 0;
-        driver!(cuMemAddressReserve(&mut ptr, len, 0, 0, 0));
+        driver!(cuMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
         Self { ptr, len }
     }
 }
@@ -198,7 +198,7 @@ fn test_behavior() {
     println!("minimun = {minimum}, recommended = {recommended}");
 
     // 分配一个较大的虚地址区域
-    let virmem = VirMem::new(10 * minimum);
+    let virmem = VirMem::new(10 * minimum, 0);
     // 分配一个较小的物理页
     let phymem = prop.create(minimum);
     // 建立映射
@@ -210,7 +210,7 @@ fn test_behavior() {
     dev.context().apply(|_| memcpy_h2d(&mut mapped, &host));
 
     // 分配另一个虚地址区域
-    let virmem = VirMem::new(2 * minimum);
+    let virmem = VirMem::new(2 * minimum, 0);
     // 将同一个物理页映射到虚地址区域
     let mapped = virmem.map(phymem);
     // 在另一个上下文中读取存储空间
@@ -226,7 +226,9 @@ fn test_reserve_many() {
         return;
     }
     let minimum = Device::new(0).mem_prop().granularity_minimum();
-    let pages = (0..1024).map(|_| VirMem::new(minimum)).collect::<Box<_>>();
+    let pages = (0..1024)
+        .map(|_| VirMem::new(minimum, 0xe_1000_0000))
+        .collect::<Box<_>>();
     for vir in pages.windows(2) {
         let [a, b] = vir else { unreachable!() };
         assert_eq!(a.as_ptr_range().end, b.as_ptr())
