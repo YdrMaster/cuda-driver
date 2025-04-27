@@ -15,7 +15,7 @@ impl<'a> From<&'a [u8]> for Data<'a> {
     }
 }
 
-impl<'a> From<Blob> for Data<'a> {
+impl From<Blob> for Data<'_> {
     fn from(value: Blob) -> Self {
         Self::Owned(value)
     }

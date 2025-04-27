@@ -1,8 +1,5 @@
 ﻿use super::Modules;
-use crate::{
-    ModuleKey,
-    nn::{cuda_type, move_type},
-};
+use crate::nn::{ModuleKey, cuda_type, move_type};
 use cuda::{DevByte, Graph, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};

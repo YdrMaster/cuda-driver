@@ -46,17 +46,17 @@ pub struct Meta {
 impl Meta {
     pub fn tokens<const N: usize>(&self, n: usize) -> Tensor<usize, N> {
         let &Self { t_tok, .. } = self;
-        Tensor::from_dim_slice(t_tok, &[n])
+        Tensor::from_dim_slice(t_tok, [n])
     }
 
     pub fn pos<const N: usize>(&self, n: usize) -> Tensor<usize, N> {
         let &Self { t_pos, .. } = self;
-        Tensor::from_dim_slice(t_pos, &[n])
+        Tensor::from_dim_slice(t_pos, [n])
     }
 
     pub fn x<const N: usize>(&self, n: usize) -> Tensor<usize, N> {
         let &Self { t_embd, d, .. } = self;
-        Tensor::from_dim_slice(t_embd, &[n, d])
+        Tensor::from_dim_slice(t_embd, [n, d])
     }
 
     pub fn attn<const N: usize>(&self, n: usize) -> Tensor<usize, N> {
@@ -67,12 +67,12 @@ impl Meta {
             dh,
             ..
         } = self;
-        Tensor::from_dim_slice(t_embd, &[n, (nh + nkvh + nkvh) * dh])
+        Tensor::from_dim_slice(t_embd, [n, (nh + nkvh + nkvh) * dh])
     }
 
     pub fn ffn<const N: usize>(&self, n: usize) -> Tensor<usize, N> {
         let &Self { t_embd, di, .. } = self;
-        Tensor::from_dim_slice(t_embd, &[n, di])
+        Tensor::from_dim_slice(t_embd, [n, di])
     }
 
     pub fn kv_cache<const N: usize>(&self, n: usize) -> Tensor<usize, N> {
@@ -83,7 +83,7 @@ impl Meta {
             dh,
             ..
         } = self;
-        Tensor::from_dim_slice(t_embd, &[n, nblk, 2, nkvh, dh])
+        Tensor::from_dim_slice(t_embd, [n, nblk, 2, nkvh, dh])
     }
 
     pub fn workspace<const N: usize>(&self, n: usize, align: usize) -> Workspace<usize, N> {

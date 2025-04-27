@@ -5,6 +5,7 @@ members = [
     "nccl",
     "search-cuda-tools",
     "search-corex-tools",
+    "nn",
     "example",
 ]
 resolver = "3"

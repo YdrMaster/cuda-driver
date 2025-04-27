@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 cuda.path = "../cuda"
 cublas.path = "../cublas"
+nn.path = "../nn"
 memmap2 = "0.9"
 ggus = { git = "https://github.com/InfiniTensor/gguf", rev = "23c362f" }
 tensor = { git = "https://github.com/YdrMaster/tensor", rev = "66450a9" }
