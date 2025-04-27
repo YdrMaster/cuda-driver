@@ -18,8 +18,8 @@ pub mod bindings {
     }
 }
 
-mod cublas;
-pub use cublas::{Cublas, CublasSpore};
+mod blas;
+pub use blas::{Computation, Cublas, CublasSpore, GemmScheme};
 
 #[cfg(nvidia)]
 mod cublaslt;

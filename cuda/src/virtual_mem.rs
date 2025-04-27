@@ -205,9 +205,7 @@ fn test_behavior() {
     let mut mapped = virmem.map(phymem.clone());
 
     // 通过虚地址操作存储空间
-    let host = (0..minimum / size_of::<usize>())
-        .map(|i| i)
-        .collect::<Box<_>>();
+    let host = (0..minimum / size_of::<usize>()).collect::<Box<_>>();
     // 对存储空间的操作仍然需要在上下文中进行
     dev.context().apply(|_| memcpy_h2d(&mut mapped, &host));
 
