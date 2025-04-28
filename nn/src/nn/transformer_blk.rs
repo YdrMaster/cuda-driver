@@ -1,5 +1,5 @@
 ﻿use super::{Attention, Context, Mlp, NNError, Normalization, NuralNetwork, Tensor};
-
+use crate::macros::destruct;
 pub struct TransformerBlk<T> {
     pub attn_norm: Normalization<T>,
     pub attn: Attention<T>,
@@ -19,11 +19,14 @@ impl<T> NuralNetwork<T> for TransformerBlk<T> {
             ffn_norm,
             ffn,
         } = self;
-
-        let tensors = ctx.trap("attn-norm", attn_norm, inputs)?;
-        let tensors = ctx.trap("attn", attn, tensors)?;
-        let tensors = ctx.trap("ffn-norm", ffn_norm, tensors)?;
-        let tensors = ctx.trap("ffn", ffn, tensors)?;
+        destruct!([x, pos] = inputs);
+        let tensors = ctx.trap("attn-norm", attn_norm, [x])?;
+        destruct!([x] = tensors);
+        let tensors = ctx.trap("attn", attn, [x, pos])?;
+        destruct!([x] = tensors);
+        let tensors = ctx.trap("ffn-norm", ffn_norm, [x])?;
+        destruct!([x] = tensors);
+        let tensors = ctx.trap("ffn", ffn, [x])?;
 
         Ok((ctx, tensors))
     }

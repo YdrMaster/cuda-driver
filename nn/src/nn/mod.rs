@@ -47,7 +47,7 @@ pub struct NNError {
 //     }
 // }
 
-mod macros {
+pub mod macros {
     macro_rules! destruct {
         ([$( $name:ident ),+] = $iter:expr) => {
             let mut iter = $iter.into_iter();

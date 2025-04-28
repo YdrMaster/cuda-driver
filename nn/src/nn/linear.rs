@@ -15,7 +15,16 @@ impl<T> NuralNetwork<T> for Linear<T> {
         inputs: impl IntoIterator<Item = Tensor<T>>,
         mut ctx: Context<T>,
     ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
-        destruct!([x] = inputs);
+        // destruct!([x] = inputs);
+        println!("Linear : {}", ctx.path());
+        let mut inputs = inputs.into_iter();
+        let x = inputs.next().unwrap();
+        match inputs.next() {
+            Some(residual) => {
+                // ..
+            }
+            None => {}
+        }
 
         let Self {
             dt,

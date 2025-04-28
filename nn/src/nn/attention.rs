@@ -54,7 +54,7 @@ impl<T> NuralNetwork<T> for Attention<T> {
 
         let [q, k] = match rope {
             Some(RoPE { nctx, sin, cos }) => {
-                let shape = [nctx, dh / 2];
+                let shape = [nctx, dh.clone() / 2];
                 let sin = ctx.weight("rope.sin", dt, shape.clone(), sin);
                 let cos = ctx.weight("rope.cos", dt, shape.clone(), cos);
                 destruct!(
@@ -71,7 +71,7 @@ impl<T> NuralNetwork<T> for Attention<T> {
             None => [q, k],
         };
 
-        destruct!([o] = ctx.call("", "attention", None, [q, k, v])?);
+        destruct!([o] = ctx.call("", "attention", Some(dh.into()), [q, k, v])?);
 
         let outputs = ctx.trap("attn-output", output, [o, residual]);
 

@@ -27,6 +27,10 @@ impl<T> NuralNetwork<T> for Normalization<T> {
         inputs: impl IntoIterator<Item = Tensor<T>>,
         mut ctx: Context<T>,
     ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
+        println!("Normalization");
+        println!("self: {:?}", ctx.path());
+        let inputs = inputs.into_iter().collect::<Vec<_>>();
+        println!("inputs: {:?}", inputs.len());
         destruct!([x] = inputs);
 
         let Self { d, epsilon, items } = self;

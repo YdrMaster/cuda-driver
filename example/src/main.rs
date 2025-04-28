@@ -3,6 +3,7 @@ mod gguf;
 mod loader;
 mod nn;
 
+use ::nn::op;
 use ::nn::{Dim, GraphBuilder, TensorMeta};
 use blob::Blob;
 use gguf::{GGufModel, GGufTensor, map_files};
@@ -99,7 +100,16 @@ fn main() {
             .collect(),
     };
 
-    let context = GraphBuilder::default();
+    let mut context = GraphBuilder::default();
+    context.register_op("embedding", op::embedding::Embedding);
+    context.register_op("rms-norm", op::normalization::RmsNorm);
+    context.register_op("layer-norm", op::normalization::LayerNorm);
+    context.register_op("attention", op::attention::Attention);
+    context.register_op("split", op::split::Split);
+    context.register_op("swiglu", op::activation::SwiGLU);
+    context.register_op("gelu", op::activation::GeLU);
+    context.register_op("linear", op::linear::Linear);
+    context.register_op("rope", op::rope::Rope);
     context
         .launch(
             llama,
