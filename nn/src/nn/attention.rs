@@ -1,4 +1,4 @@
-﻿use super::{Linear, NNCtx, NNError, NuralNetwork, Tensor, macros::*};
+﻿use super::{Context, Linear, NNError, NuralNetwork, Tensor, macros::*};
 use crate::{Arg, Dim};
 
 pub struct Attention<T> {
@@ -19,8 +19,8 @@ impl<T> NuralNetwork<T> for Attention<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         destruct!([x, pos] = inputs);
 
         let Self {

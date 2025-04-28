@@ -1,4 +1,4 @@
-﻿use super::{Activation, Linear, NNCtx, NNError, NuralNetwork, Tensor, macros::destruct};
+﻿use super::{Activation, Context, Linear, NNError, NuralNetwork, Tensor, macros::destruct};
 
 pub struct Mlp<T> {
     pub up: Linear<T>,
@@ -10,8 +10,8 @@ impl<T> NuralNetwork<T> for Mlp<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         let Self { up, act, down } = self;
 
         destruct!([x] = inputs);

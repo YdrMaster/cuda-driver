@@ -1,4 +1,4 @@
-﻿use super::{NNCtx, NNError, NuralNetwork, Tensor};
+﻿use super::{Context, NNError, NuralNetwork, Tensor};
 use crate::Dim;
 use digit_layout::DigitLayout;
 
@@ -18,8 +18,8 @@ impl<T> NuralNetwork<T> for Embedding<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         let Self { dt, d, wte, wpe } = self;
         let mut inputs = inputs.into_iter();
 

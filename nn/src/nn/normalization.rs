@@ -1,4 +1,4 @@
-﻿use super::{NNCtx, NNError, NuralNetwork, Tensor, macros::destruct};
+﻿use super::{Context, NNError, NuralNetwork, Tensor, macros::destruct};
 use crate::Dim;
 use digit_layout::DigitLayout;
 
@@ -25,8 +25,8 @@ impl<T> NuralNetwork<T> for Normalization<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         destruct!([x] = inputs);
 
         let Self { d, epsilon, items } = self;

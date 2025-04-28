@@ -1,4 +1,4 @@
-﻿use super::{Embedding, NNCtx, NNError, NuralNetwork, Tensor, TransformerBlk, macros::destruct};
+﻿use super::{Context, Embedding, NNError, NuralNetwork, Tensor, TransformerBlk, macros::destruct};
 
 pub struct LLaMA<T> {
     pub embedding: Embedding<T>,
@@ -9,8 +9,8 @@ impl<T> NuralNetwork<T> for LLaMA<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         let Self { embedding, blks } = self;
 
         destruct!([tokens, pos] = inputs);

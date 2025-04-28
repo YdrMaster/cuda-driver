@@ -1,30 +1,32 @@
-﻿use super::{Context, Tensor};
-use crate::{Arg, Dim, NNError, NuralNetwork};
+﻿use super::{Edge, GraphBuilder, Node, Tensor, TensorMeta, internal::GraphContext};
+use crate::{Arg, Dim, Graph, NNError, NuralNetwork};
 use digit_layout::DigitLayout;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
 };
 
-impl<T> Context<T> {
-    pub fn launch<NN: NuralNetwork<T>>(
-        self,
+impl GraphBuilder {
+    pub fn launch<T, NN: NuralNetwork<T>>(
+        &self,
         nn: NN,
-        inputs: impl IntoIterator<Item = Tensor<T>>,
-    ) -> Result<Vec<Tensor<T>>, NNError> {
-        trap::<T, NN>("Ω".into(), &self, nn, inputs)
+        inputs: impl IntoIterator<Item = TensorMeta>,
+    ) -> Result<Graph<Node, Edge<T>>, NNError> {
+        let (context, inputs) = self.new_context(inputs);
+        let outputs = trap::<T, NN>("Ω".into(), &context, nn, inputs)?;
+        Ok(context.take().into_graph(outputs))
     }
 }
 
-pub struct NNCtx<'g, T> {
+pub struct Context<'g, T> {
     path: String,
-    graph: &'g Context<T>,
+    graph: &'g GraphContext<T>,
     weights: HashSet<String>,
     sub: NameDecorator,
     ops: NameDecorator,
 }
 
-impl<T> NNCtx<'_, T> {
+impl<T> Context<'_, T> {
     pub fn path(&self) -> &str {
         &self.path
     }
@@ -89,15 +91,15 @@ impl<T> NNCtx<'_, T> {
 #[inline(always)]
 fn trap<T, NN: NuralNetwork<T>>(
     path: String,
-    graph: &Context<T>,
+    context: &GraphContext<T>,
     nn: NN,
     inputs: impl IntoIterator<Item = Tensor<T>>,
 ) -> Result<Vec<Tensor<T>>, NNError> {
     nn.launch(
         inputs,
-        NNCtx {
+        Context {
             path,
-            graph,
+            graph: context,
             weights: Default::default(),
             sub: Default::default(),
             ops: Default::default(),

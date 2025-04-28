@@ -7,7 +7,7 @@ mod mlp;
 mod normalization;
 mod transformer_blk;
 
-use crate::{OpError, Tensor, ctx::NNCtx};
+use crate::{OpError, Tensor, ctx::Context};
 
 pub use activation::Activation;
 pub use attention::{Attention, RoPE};
@@ -22,8 +22,8 @@ pub trait NuralNetwork<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError>;
+        ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError>;
 }
 
 #[derive(Debug)]

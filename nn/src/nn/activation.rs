@@ -1,4 +1,4 @@
-﻿use super::{NNCtx, NNError, NuralNetwork, Tensor, macros::*};
+﻿use super::{Context, NNError, NuralNetwork, Tensor, macros::*};
 use crate::Arg;
 
 #[derive(Clone, Copy)]
@@ -11,8 +11,8 @@ impl<T> NuralNetwork<T> for Activation {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         destruct!([x] = inputs);
         dims!([_, d] = x);
 

@@ -3,7 +3,7 @@ mod gguf;
 mod loader;
 mod nn;
 
-use ::nn::{Context, Dim};
+use ::nn::{Dim, GraphBuilder, TensorMeta};
 use blob::Blob;
 use gguf::{GGufModel, GGufTensor, map_files};
 use ggus::{GGufMetaMapExt, ggml_quants::digit_layout::types};
@@ -31,79 +31,82 @@ fn main() {
     let di = meta![gguf => llm_feed_forward_length] * 2;
     let epsilon = meta![gguf => llm_attention_layer_norm_rms_epsilon; 1e-5];
 
-    let context = Context::default();
-    let x = context.global_input(types::U32, [Dim::var("n")]);
-    let pos = context.global_input(types::U32, [Dim::var("n")]);
+    let llama = ::nn::LLaMA {
+        embedding: ::nn::Embedding {
+            dt: types::F32,
+            d: d.into(),
+            wte: ::nn::Table {
+                row: nvoc.into(),
+                weight: "token_embd.weight".to_string(),
+            },
+            wpe: None,
+        },
+        blks: (0..nblk)
+            .map(|iblk| ::nn::TransformerBlk {
+                attn_norm: ::nn::Normalization {
+                    d: d.into(),
+                    epsilon: epsilon as _,
+                    items: ::nn::NormType::RmsNorm {
+                        dt: types::F32,
+                        scale: format!("blk.{iblk}.attn_norm.weight"),
+                    },
+                },
+                attn: ::nn::Attention {
+                    nh: nh.into(),
+                    nkvh: nkvh.into(),
+                    qkv: ::nn::Linear {
+                        dt: types::F32,
+                        shape: [((nh + nkvh + nkvh) * dh).into(), d.into()],
+                        weight: format!("blk.{iblk}.attn_qkv.weight"),
+                        bias: None,
+                    },
+                    rope: Some(::nn::RoPE {
+                        nctx: nctx.into(),
+                        sin: "sin_table".into(),
+                        cos: "cos_table".into(),
+                    }),
+                    output: ::nn::Linear {
+                        dt: types::F32,
+                        shape: [d.into(), (nh * dh).into()],
+                        weight: format!("blk.{iblk}.attn_output.weight"),
+                        bias: None,
+                    },
+                },
+                ffn_norm: ::nn::Normalization {
+                    d: d.into(),
+                    epsilon: epsilon as _,
+                    items: ::nn::NormType::RmsNorm {
+                        dt: types::F32,
+                        scale: format!("blk.{iblk}.ffn_norm.weight"),
+                    },
+                },
+                ffn: ::nn::Mlp {
+                    up: ::nn::Linear {
+                        dt: types::F32,
+                        shape: [(di * 2).into(), d.into()],
+                        weight: format!("blk.{iblk}.ffn_gate_up.weight"),
+                        bias: None,
+                    },
+                    act: ::nn::Activation::SwiGLU,
+                    down: ::nn::Linear {
+                        dt: types::F32,
+                        shape: [di.into(), d.into()],
+                        weight: format!("blk.{iblk}.ffn_down.weight"),
+                        bias: None,
+                    },
+                },
+            })
+            .collect(),
+    };
+
+    let context = GraphBuilder::default();
     context
         .launch(
-            ::nn::LLaMA {
-                embedding: ::nn::Embedding {
-                    dt: types::F32,
-                    d: d.into(),
-                    wte: ::nn::Table {
-                        row: nvoc.into(),
-                        weight: "token_embd.weight".to_string(),
-                    },
-                    wpe: None,
-                },
-                blks: (0..nblk)
-                    .map(|iblk| ::nn::TransformerBlk {
-                        attn_norm: ::nn::Normalization {
-                            d: d.into(),
-                            epsilon: epsilon as _,
-                            items: ::nn::NormType::RmsNorm {
-                                dt: types::F32,
-                                scale: format!("blk.{iblk}.attn_norm.weight"),
-                            },
-                        },
-                        attn: ::nn::Attention {
-                            nh: nh.into(),
-                            nkvh: nkvh.into(),
-                            qkv: ::nn::Linear {
-                                dt: types::F32,
-                                shape: [((nh + nkvh + nkvh) * dh).into(), d.into()],
-                                weight: format!("blk.{iblk}.attn_qkv.weight"),
-                                bias: None,
-                            },
-                            rope: Some(::nn::RoPE {
-                                nctx: nctx.into(),
-                                sin: "sin_table".into(),
-                                cos: "cos_table".into(),
-                            }),
-                            output: ::nn::Linear {
-                                dt: types::F32,
-                                shape: [d.into(), (nh * dh).into()],
-                                weight: format!("blk.{iblk}.attn_output.weight"),
-                                bias: None,
-                            },
-                        },
-                        ffn_norm: ::nn::Normalization {
-                            d: d.into(),
-                            epsilon: epsilon as _,
-                            items: ::nn::NormType::RmsNorm {
-                                dt: types::F32,
-                                scale: format!("blk.{iblk}.ffn_norm.weight"),
-                            },
-                        },
-                        ffn: ::nn::Mlp {
-                            up: ::nn::Linear {
-                                dt: types::F32,
-                                shape: [(di * 2).into(), d.into()],
-                                weight: format!("blk.{iblk}.ffn_gate_up.weight"),
-                                bias: None,
-                            },
-                            act: ::nn::Activation::SwiGLU,
-                            down: ::nn::Linear {
-                                dt: types::F32,
-                                shape: [di.into(), d.into()],
-                                weight: format!("blk.{iblk}.ffn_down.weight"),
-                                bias: None,
-                            },
-                        },
-                    })
-                    .collect(),
-            },
-            [x, pos],
+            llama,
+            [
+                TensorMeta::new(types::U32, [Dim::var("n")]),
+                TensorMeta::new(types::U32, [Dim::var("n")]),
+            ],
         )
         .unwrap();
 }

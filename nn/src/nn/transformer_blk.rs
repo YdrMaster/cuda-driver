@@ -1,4 +1,4 @@
-﻿use super::{Attention, Mlp, NNCtx, NNError, Normalization, NuralNetwork, Tensor};
+﻿use super::{Attention, Context, Mlp, NNError, Normalization, NuralNetwork, Tensor};
 
 pub struct TransformerBlk<T> {
     pub attn_norm: Normalization<T>,
@@ -11,8 +11,8 @@ impl<T> NuralNetwork<T> for TransformerBlk<T> {
     fn launch(
         self,
         inputs: impl IntoIterator<Item = Tensor<T>>,
-        mut ctx: NNCtx<T>,
-    ) -> Result<(NNCtx<T>, Vec<Tensor<T>>), NNError> {
+        mut ctx: Context<T>,
+    ) -> Result<(Context<T>, Vec<Tensor<T>>), NNError> {
         let Self {
             attn_norm,
             attn,
