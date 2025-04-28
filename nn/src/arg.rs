@@ -36,7 +36,7 @@ impl From<HashMap<String, Arg>> for Arg {
 
 impl Arg {
     pub fn int(value: usize) -> Self {
-        Self::Dim(Dim::Const(value))
+        Self::Dim(Dim::Constant(value))
     }
 
     pub fn float(value: f64) -> Self {

@@ -227,7 +227,7 @@ fn test_reserve_many() {
     }
     let minimum = Device::new(0).mem_prop().granularity_minimum();
     let pages = (0..1024)
-        .map(|_| VirMem::new(minimum, 0xe_1000_0000))
+        .map(|_| VirMem::new(minimum, 0xe_8000_0000))
         .collect::<Box<_>>();
     for vir in pages.windows(2) {
         let [a, b] = vir else { unreachable!() };
