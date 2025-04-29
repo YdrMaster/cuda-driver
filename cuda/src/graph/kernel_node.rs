@@ -1,5 +1,8 @@
-﻿use super::{Graph, GraphNode, KernelNode};
-use crate::{AsRaw, Dim3, KernelFn, bindings::CUDA_KERNEL_NODE_PARAMS};
+﻿use super::{Graph, GraphNode, HostFnNode, KernelNode};
+use crate::{
+    AsRaw, Dim3, KernelFn,
+    bindings::{CUDA_HOST_NODE_PARAMS, CUDA_KERNEL_NODE_PARAMS, CUhostFn},
+};
 use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 impl Graph {
@@ -57,5 +60,46 @@ impl Graph {
             params
         ));
         KernelNode(node, PhantomData)
+    }
+
+    pub fn add_host_node(
+        &self,
+        host_fn: CUhostFn,
+        user_data: *mut c_void,
+        dependencies: &[GraphNode],
+    ) -> HostFnNode {
+        let dependencies = dependencies
+            .iter()
+            .map(|n| unsafe { n.as_raw() })
+            .collect::<Box<_>>();
+
+        let cuda_host_node_params = CUDA_HOST_NODE_PARAMS {
+            fn_: host_fn,
+            userData: user_data,
+        };
+        let mut node = null_mut();
+        driver!(cuGraphAddHostNode(
+            &mut node,
+            self.as_raw(),
+            dependencies.as_ptr(),
+            dependencies.len(),
+            &cuda_host_node_params,
+        ));
+        HostFnNode(node, PhantomData)
+    }
+
+    pub fn add_host_node_with_rust_fn(
+        &self,
+        host_fn: impl Fn() + Send + Sync + 'static,
+        dependencies: &[GraphNode],
+    ) -> HostFnNode {
+        extern "C" fn c_host_fn(user_data: *mut c_void) {
+            let host_fn = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn()>) };
+            host_fn();
+        }
+        let boxed_closure: Box<dyn Fn()> = Box::new(host_fn);
+
+        let user_data = Box::into_raw(Box::new(boxed_closure));
+        self.add_host_node(Some(c_host_fn), user_data as *mut c_void, dependencies)
     }
 }
