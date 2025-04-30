@@ -34,7 +34,7 @@ impl Stream<'_> {
         &self,
         f: &KernelFn,
         attrs: (impl Into<Dim3>, impl Into<Dim3>, usize),
-        params: *const *const c_void,
+        params: &[*const c_void],
     ) -> &Self {
         let (grid, block, shared_mem) = attrs;
         let grid = grid.into();
@@ -49,7 +49,7 @@ impl Stream<'_> {
             block.z,
             shared_mem as _,
             self.0.rss,
-            params as _,
+            params.as_ptr() as _,
             null_mut(),
         ));
         self

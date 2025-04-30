@@ -7,7 +7,7 @@ impl Graph {
         &self,
         f: &KernelFn,
         attrs: (impl Into<Dim3>, impl Into<Dim3>, usize),
-        params: *const *const c_void,
+        params: &[*const c_void],
         dependencies: &[GraphNode],
     ) -> KernelNode {
         let (grid, block, shared_mem) = attrs;
@@ -22,7 +22,7 @@ impl Graph {
             blockDimY: block.y,
             blockDimZ: block.z,
             sharedMemBytes: shared_mem as _,
-            kernelParams: params as _,
+            kernelParams: params.as_ptr() as _,
             extra: null_mut(),
             kern: null_mut(),
             ctx: null_mut(),

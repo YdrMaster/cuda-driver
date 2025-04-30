@@ -10,6 +10,7 @@ use std::{
     ffi::{CStr, c_int, c_void},
     fmt,
     marker::PhantomData,
+    ops::Deref,
     ptr::null_mut,
 };
 
@@ -32,7 +33,7 @@ impl Module<'_> {
 
 impl AsRaw for KernelFn<'_> {
     type Raw = CUfunction;
-
+    #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
     }
@@ -122,33 +123,92 @@ impl fmt::Display for InfoFmt<'_> {
     }
 }
 
-pub trait AsParam {
-    #[inline(always)]
-    fn as_param(&self) -> *const c_void {
-        (&raw const *self).cast()
+#[macro_export]
+macro_rules! params {
+    [$( $p:expr ),*] => {{
+        let mut params = $crate::KernelParams::new();
+        $( params.push($p); )*
+        params
+    }};
+}
+
+pub struct KernelParams {
+    size: usize,
+    data: Vec<u64>,
+    each: Vec<usize>,
+}
+
+impl KernelParams {
+    pub fn new() -> Self {
+        Self {
+            size: 0,
+            data: Vec::with_capacity(2),
+            each: Vec::with_capacity(2),
+        }
+    }
+
+    pub fn push<T: Copy>(&mut self, param: T) {
+        // 计算参数对齐
+        let mask = align_of::<T>() - 1;
+        assert!(mask < align_of::<u64>());
+        // 计算参数偏移
+        let cursor = (self.size + mask) & (!mask);
+        self.each.push(cursor);
+        // 计算长度，扩张缓冲区
+        const UNIT: usize = size_of::<u64>();
+        self.size = cursor + size_of::<T>();
+        self.data.resize(self.size.div_ceil(UNIT) * UNIT, 0);
+        // 拷贝参数数据
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                (&raw const param).cast::<u8>(),
+                self.data.as_mut_ptr().cast::<u8>().add(cursor),
+                size_of::<T>(),
+            )
+        }
+    }
+
+    pub fn to_ptrs(&self) -> KernelParamPtrs {
+        KernelParamPtrs(
+            self.each
+                .iter()
+                .map(|&offset| unsafe { self.data.as_ptr().byte_add(offset) }.cast())
+                .collect(),
+            PhantomData,
+        )
     }
 }
 
-impl<T: Copy> AsParam for T {}
+#[derive(Clone, Default)]
+#[repr(transparent)]
+pub struct KernelParamPtrs<'a>(Box<[*const c_void]>, PhantomData<&'a ()>);
 
-#[macro_export]
-macro_rules! params {
-    [$($p:expr),*] => {{
-        use $crate::AsParam;
-        [$($p.as_param()),*]
-    }};
+impl KernelParamPtrs<'_> {
+    pub fn empty() -> Self {
+        Default::default()
+    }
+}
+
+impl Deref for KernelParamPtrs<'_> {
+    type Target = [*const c_void];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[test]
 fn test_macro() {
     let params = params![1i32, 2i32, 3i32, 4i32, 5i32];
-    assert!(params.windows(2).all(|s| !s[0].is_null()
+    assert!(params.to_ptrs().0.windows(2).all(|s| !s[0].is_null()
         && !s[1].is_null()
         && s[1] == unsafe { s[0].add(size_of::<i32>()) }));
 
     let params = params
-        .into_iter()
-        .map(|ptr| unsafe { *(ptr as *const i32) })
+        .to_ptrs()
+        .0
+        .iter()
+        .map(|&ptr| unsafe { *(ptr as *const i32) })
         .collect::<Vec<_>>();
     assert_eq!(params, [1, 2, 3, 4, 5])
 }

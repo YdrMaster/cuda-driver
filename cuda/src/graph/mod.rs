@@ -297,17 +297,17 @@ extern "C" __global__ void mul(float *a, float const *b) {
                     .launch(
                         &add,
                         (1, 1024, 0),
-                        params![a.as_mut_ptr(), b.as_mut_ptr()].as_ptr(),
+                        &params![a.as_mut_ptr(), b.as_mut_ptr()].to_ptrs(),
                     )
                     .launch(
                         &sub,
                         (1, 1024, 0),
-                        params![c.as_mut_ptr(), d.as_mut_ptr()].as_ptr(),
+                        &params![c.as_mut_ptr(), d.as_mut_ptr()].to_ptrs(),
                     )
                     .launch(
                         &mul,
                         (1, 1024, 0),
-                        params![a.as_mut_ptr(), c.as_mut_ptr()].as_ptr(),
+                        &params![a.as_mut_ptr(), c.as_mut_ptr()].to_ptrs(),
                     )
                     .memcpy_d2h(&mut ans, &a)
                     .free(a)
@@ -338,7 +338,7 @@ extern "C" __global__ void mul(float *a, float const *b) {
 
             let stream = ctx.stream().capture();
             // cuda graph 会将 kernel 用到的参数拷贝保存在节点中
-            stream.launch(&kernel, ((), (), 0), params![10].as_ptr());
+            stream.launch(&kernel, ((), (), 0), &params![10].to_ptrs());
             let graph = stream.end();
             let stream = ctx.stream();
 

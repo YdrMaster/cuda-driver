@@ -4,7 +4,7 @@ mod ptx;
 
 use std::{ffi::CString, str::FromStr};
 
-pub use kernel_fn::{AsParam, KernelFn};
+pub use kernel_fn::{KernelFn, KernelParamPtrs, KernelParams};
 pub use module::{Module, ModuleSpore};
 pub use ptx::Ptx;
 
