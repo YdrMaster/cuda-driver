@@ -1,6 +1,6 @@
 ﻿use super::{Graph, GraphNode, MemcpyNode};
 use crate::{
-    AsRaw, CurrentCtx, DevByte,
+    AsRaw, DevByte,
     bindings::{CUDA_MEMCPY3D, CUmemorytype},
 };
 use std::{
@@ -45,56 +45,31 @@ impl Graph {
         dependencies: &[GraphNode],
     ) -> MemcpyNode {
         assert_eq!(size_of_val(dst), size_of_val(src));
-        self.add_memcpy_d2d_ptr(
-            dst.as_mut_ptr(),
-            src.as_ptr(),
-            size_of_val(dst),
+        self.add_memcpy_node_with_params(
+            &CUDA_MEMCPY3D {
+                srcMemoryType: CUmemorytype::CU_MEMORYTYPE_DEVICE,
+                srcDevice: src.as_ptr() as _,
+                dstMemoryType: CUmemorytype::CU_MEMORYTYPE_DEVICE,
+                dstDevice: dst.as_mut_ptr() as _,
+                WidthInBytes: size_of_val(dst),
+                ..CFG
+            },
             dependencies,
         )
     }
 
-    pub fn add_memcpy_d2d_ptr(
-        &self,
-        dst: *mut DevByte,
-        src: *const DevByte,
-        len: usize,
-        dependencies: &[GraphNode],
-    ) -> MemcpyNode {
-        CurrentCtx::apply_current(|ctx| {
-            self.add_memcpy_node_with_params(
-                ctx,
-                &CUDA_MEMCPY3D {
-                    srcMemoryType: CUmemorytype::CU_MEMORYTYPE_DEVICE,
-                    srcDevice: src as _,
-                    dstMemoryType: CUmemorytype::CU_MEMORYTYPE_DEVICE,
-                    dstDevice: dst as _,
-                    WidthInBytes: len,
-                    ..CFG
-                },
-                dependencies,
-            )
-        })
-        .unwrap()
-    }
-
-    pub fn add_memcpy_node(
-        &self,
-        ctx: &CurrentCtx,
-        node: &MemcpyNode,
-        dependencies: &[GraphNode],
-    ) -> MemcpyNode {
+    pub fn add_memcpy_node(&self, node: &MemcpyNode, dependencies: &[GraphNode]) -> MemcpyNode {
         let mut params = MaybeUninit::uninit();
         driver!(cuGraphMemcpyNodeGetParams(
             node.as_raw(),
             params.as_mut_ptr()
         ));
 
-        self.add_memcpy_node_with_params(ctx, unsafe { params.assume_init_ref() }, dependencies)
+        self.add_memcpy_node_with_params(unsafe { params.assume_init_ref() }, dependencies)
     }
 
     pub fn add_memcpy_node_with_params(
         &self,
-        ctx: &CurrentCtx,
         params: &CUDA_MEMCPY3D,
         dependencies: &[GraphNode],
     ) -> MemcpyNode {
@@ -110,7 +85,7 @@ impl Graph {
             dependencies.as_ptr(),
             dependencies.len(),
             params,
-            ctx.as_raw(),
+            null_mut(),
         ));
         MemcpyNode(node, PhantomData)
     }
@@ -118,7 +93,7 @@ impl Graph {
 
 #[cfg(test)]
 mod test {
-    use crate::{Device, Graph, GraphNode, memcpy_d2h};
+    use crate::{DevByte, Device, Graph, GraphNode, VirMem, memcpy_d2h, memcpy_h2d};
     use context_spore::AsRaw;
     use std::mem::MaybeUninit;
 
@@ -156,12 +131,65 @@ mod test {
         }
 
         Device::new(0).context().apply(|ctx| {
-            let origin = (0..128u64).collect::<Box<_>>();
-            let src = ctx.from_host(&origin);
-            let mut dst = ctx.malloc::<u8>(src.len());
+            let mut src = ctx.malloc::<u8>(2 << 10);
+            let mut dst = ctx.malloc::<u8>(2 << 10);
 
             let graph = Graph::new();
             graph.add_memcpy_d2d(&mut dst, &src, &[]);
+            test_memcpy_in_graph(&ctx.dev(), &graph, &mut dst, &mut src, 0..u64::MAX);
+        })
+    }
+
+    #[test]
+    fn test_vm() {
+        if let Err(crate::NoDevice) = crate::init() {
+            return;
+        }
+
+        let dev = Device::new(0);
+        let prop = dev.mem_prop();
+        let minium = prop.granularity_minimum();
+
+        let mut dst = VirMem::new(minium, 0).map_on(&dev);
+        let src = VirMem::new(minium, 0).map_on(&dev);
+
+        let graph = Graph::new();
+        // 虚存不能直接传入 memcpy node，当时必须是已映射状态
+        graph.add_memcpy_d2d(&mut dst, &src, &[]);
+
+        let phy0 = prop.create(minium);
+        let phy1 = prop.create(minium);
+        let phy2 = prop.create(minium);
+        let phy3 = prop.create(minium);
+
+        let (vir_dst, _) = dst.unmap();
+        let (vir_src, _) = src.unmap();
+        let mut dst = vir_dst.map(phy0);
+        let mut src = vir_src.map(phy1);
+        test_memcpy_in_graph(&dev, &graph, &mut dst, &mut src, 0..);
+
+        let (vir_dst, _phy0) = dst.unmap();
+        let (vir_src, _phy1) = src.unmap();
+        let mut dst = vir_dst.map(phy2);
+        let mut src = vir_src.map(phy3);
+        test_memcpy_in_graph(&dev, &graph, &mut dst, &mut src, (0..u64::MAX).rev());
+    }
+
+    fn test_memcpy_in_graph(
+        dev: &Device,
+        graph: &Graph,
+        dst: &mut [DevByte],
+        src: &mut [DevByte],
+        origin: impl IntoIterator<Item = u64>,
+    ) {
+        assert_eq!(dst.len(), src.len());
+        let origin = origin
+            .into_iter()
+            .take(dst.len() / size_of::<u64>())
+            .collect::<Box<_>>();
+        dev.context().apply(|ctx| {
+            memcpy_h2d(src, &origin);
+
             ctx.instantiate(&graph).launch(&ctx.stream());
 
             let mut host = vec![0u64; origin.len()];

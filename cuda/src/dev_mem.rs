@@ -8,7 +8,7 @@ use std::{
 };
 
 #[repr(transparent)]
-pub struct DevByte(#[allow(unused)] u8);
+pub struct DevByte(u8);
 
 #[inline]
 pub fn memcpy_d2h<T: Copy>(dst: &mut [T], src: &[DevByte]) {
