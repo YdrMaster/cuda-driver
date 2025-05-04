@@ -146,6 +146,12 @@ macro_rules! typed_node {
                     self.0
                 }
             }
+
+            impl<'a> From<$name<'a>> for GraphNode<'a> {
+                fn from(node: $name) -> Self {
+                    GraphNode::new(node.0)
+                }
+            }
         )+
     };
 }
