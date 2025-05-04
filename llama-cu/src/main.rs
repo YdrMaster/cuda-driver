@@ -138,6 +138,8 @@ fn main() {
                 "embedding" => add_to_graph!(Embedding),
                 "rms-norm" => add_to_graph!(RmsNorm),
                 "linear" => add_to_graph!(Linear),
+                "rope" => add_to_graph!(Rope),
+                "swiglu" => add_to_graph!(Swiglu),
                 "empty" => deps,
                 "attention" => {
                     let graph = std::mem::replace(&mut graph, cuda::Graph::new());
