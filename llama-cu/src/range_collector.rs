@@ -73,12 +73,6 @@ impl<T> Default for NumCollector<T> {
     }
 }
 
-impl<T> NumCollector<T> {
-    pub fn new() -> Self {
-        Self(Default::default())
-    }
-}
-
 impl<T: Eq + Hash> NumCollector<T> {
     pub fn insert(&mut self, t: T) {
         *self.0.entry(t).or_insert(0) += 1

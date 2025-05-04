@@ -2,13 +2,15 @@ mod blob;
 mod gguf;
 mod llama;
 mod loader;
+mod op;
 mod range_collector;
 
 use cuda::{Device, VirByte, VirMem};
 use gguf::{GGufModel, map_files};
 use ggus::ggml_quants::digit_layout::types;
 use loader::WeightLoader;
-use nn::{Dim, Exec, GraphBuilder, Node, TensorMeta, op};
+use nn::{Dim, Exec, GraphBuilder, Node, TensorMeta, op as nn_op};
+use op::Operator;
 use range_collector::RangeCollector;
 use std::{fmt, time::Instant};
 
@@ -21,16 +23,16 @@ fn main() {
     times.push("load");
 
     let nn::Graph(graph::Graph { topo, nodes, edges }) = GraphBuilder::default()
-        .register_op("embedding", op::embedding::Embedding)
-        .register_op("rms-norm", op::normalization::RmsNorm)
-        .register_op("layer-norm", op::normalization::LayerNorm)
-        .register_op("attention", op::attention::Attention)
-        .register_op("split", op::split::Split)
-        .register_op("swiglu", op::activation::SwiGLU)
-        .register_op("gelu", op::activation::GeLU)
-        .register_op("linear", op::linear::Linear)
-        .register_op("rope", op::rope::Rope)
-        .register_op("concat", op::concat::Concat)
+        .register_op("embedding", nn_op::embedding::Embedding)
+        .register_op("rms-norm", nn_op::normalization::RmsNorm)
+        .register_op("layer-norm", nn_op::normalization::LayerNorm)
+        .register_op("attention", nn_op::attention::Attention)
+        .register_op("split", nn_op::split::Split)
+        .register_op("swiglu", nn_op::activation::SwiGLU)
+        .register_op("gelu", nn_op::activation::GeLU)
+        .register_op("linear", nn_op::linear::Linear)
+        .register_op("rope", nn_op::rope::Rope)
+        .register_op("concat", nn_op::concat::Concat)
         .build(
             llama,
             [
@@ -116,32 +118,37 @@ fn main() {
 
     println!("{times}");
 
-    let mut i = 0;
-    let mut graph = vec![];
-
-    for Exec {
-        node,
-        inputs,
-        outputs,
-    } in exec
-    {
-        let Node { op, arg, .. } = node;
-        match &*op {
-            "embedding" | "rms-norm" | "linear" | "rope" | "swiglu" => {
-                graph.push(op);
+    // let mut graph = cuda::Graph::new();
+    // let mut computation = Vec::new();
+    dev.context().apply(|ctx| {
+        let mut modules = op::Modules::new(ctx);
+        let mut graph = cuda::Graph::new();
+        let mut nodes = vec![];
+        for Exec {
+            node,
+            inputs,
+            outputs,
+        } in exec
+        {
+            let Node { op, arg, .. } = node;
+            let deps = std::mem::take(&mut nodes);
+            macro_rules! add_to_graph {
+                ($op:ident) => {
+                    op::$op::add_to_graph(&graph, &deps, &mut modules, arg, inputs, outputs)
+                };
             }
-            "attention" => {
-                println!("{i} {graph:?}");
-                i += 1;
-                println!("{i} [\"attention\"]");
-                i += 1;
-                graph.clear();
-            }
-            "empty" => {}
-            _ => todo!(),
+            nodes = match &*op {
+                "embedding" => add_to_graph!(Embedding),
+                "rms-norm" => add_to_graph!(RmsNorm),
+                "linear" => add_to_graph!(Linear),
+                _ => {
+                    println!("next is {op}");
+                    break;
+                }
+            };
         }
-    }
-    println!("{i} {graph:?}")
+        graph.save_dot(std::env::current_dir().unwrap().join("graph.dot"));
+    })
 }
 
 #[derive(Default)]
