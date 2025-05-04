@@ -114,6 +114,14 @@ impl Drop for PhyMem {
     }
 }
 
+impl AsRaw for PhyMem {
+    type Raw = CUmemGenericAllocationHandle;
+    #[inline]
+    unsafe fn as_raw(&self) -> Self::Raw {
+        self.handle
+    }
+}
+
 impl PhyMem {
     #[inline]
     pub const fn len(&self) -> usize {

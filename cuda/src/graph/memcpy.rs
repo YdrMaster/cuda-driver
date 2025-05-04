@@ -1,8 +1,9 @@
 ﻿use super::{Graph, GraphNode, MemcpyNode};
 use crate::{
-    AsRaw, DevByte,
+    DevByte,
     bindings::{CUDA_MEMCPY3D, CUmemorytype},
 };
+use context_spore::AsRaw;
 use std::{
     marker::PhantomData,
     mem::MaybeUninit,
@@ -93,8 +94,7 @@ impl Graph {
 
 #[cfg(test)]
 mod test {
-    use crate::{DevByte, Device, Graph, GraphNode, VirMem, memcpy_d2h, memcpy_h2d};
-    use context_spore::AsRaw;
+    use crate::{AsRaw, DevByte, Device, Graph, GraphNode, VirMem, memcpy_d2h, memcpy_h2d};
     use std::mem::MaybeUninit;
 
     #[test]

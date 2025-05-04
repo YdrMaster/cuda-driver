@@ -1,5 +1,6 @@
 ﻿use super::{Graph, GraphNode, KernelNode};
-use crate::{AsRaw, Dim3, KernelFn, bindings::CUDA_KERNEL_NODE_PARAMS};
+use crate::{Dim3, KernelFn, bindings::CUDA_KERNEL_NODE_PARAMS};
+use context_spore::AsRaw;
 use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 impl Graph {
