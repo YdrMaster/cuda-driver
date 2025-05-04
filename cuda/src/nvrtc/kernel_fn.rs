@@ -138,6 +138,12 @@ pub struct KernelParams {
     each: Vec<usize>,
 }
 
+impl Default for KernelParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KernelParams {
     pub fn new() -> Self {
         Self {
