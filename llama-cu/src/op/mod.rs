@@ -1,6 +1,8 @@
 ﻿mod embedding;
 mod linear;
 mod rms_norm;
+mod rope;
+mod swiglu;
 
 use cuda::{CurrentCtx, Graph, GraphNode, Module, Ptx, VirByte};
 use nn::Tensor;
@@ -10,6 +12,8 @@ use tensor::digit_layout::{DigitLayout, types};
 pub use embedding::Embedding;
 pub use linear::Linear;
 pub use rms_norm::RmsNorm;
+pub use rope::Rope;
+pub use swiglu::Swiglu;
 
 pub trait Operator {
     fn add_to_graph<'a, const N: usize>(
@@ -88,5 +92,13 @@ mod macros {
         };
     }
 
-    pub(crate) use {destruct, dims};
+    macro_rules! strides {
+        ($pat:pat = $tensor:expr) => {
+            let &$pat = &*$tensor.strides() else {
+                panic!("Ndim mismatch ( = {})", $tensor.strides().len())
+            };
+        };
+    }
+
+    pub(crate) use {destruct, dims, strides};
 }
