@@ -9,7 +9,7 @@ use cuda::{Device, VirByte, VirMem};
 use gguf::{GGufModel, map_files};
 use ggus::ggml_quants::digit_layout::types;
 use loader::WeightLoader;
-use nn::{Dim, Exec, GraphBuilder, Node, TensorMeta, op as nn_op};
+use nn::{Dim, GraphBuilder, Node, Tensor, TensorMeta, op as nn_op};
 use op::Operator;
 use range_collector::RangeCollector;
 use std::{fmt, time::Instant};
@@ -118,9 +118,10 @@ fn main() {
 
     dev.context().apply(|ctx| {
         let mut modules = op::Modules::new(ctx);
-        let graph = cuda::Graph::new();
+        let mut graph = cuda::Graph::new();
         let mut nodes = vec![];
-        for Exec {
+        let mut exec_ = Vec::with_capacity(exec.len());
+        for nn::Exec {
             node,
             inputs,
             outputs,
@@ -138,8 +139,28 @@ fn main() {
                 "rms-norm" => add_to_graph!(RmsNorm),
                 "linear" => add_to_graph!(Linear),
                 "empty" => deps,
+                "attention" => {
+                    let graph = std::mem::replace(&mut graph, cuda::Graph::new());
+                    exec_.push(Exec::Graph(ctx.instantiate(&graph)));
+
+                    let Some(nn::Arg::Int(dh)) = arg else {
+                        panic!()
+                    };
+                    let mut inputs = inputs.into_iter();
+                    let mut outputs = outputs.into_iter();
+                    exec_.push(Exec::Attention {
+                        dh: dh as _,
+                        q: inputs.next().unwrap(),
+                        k: inputs.next().unwrap(),
+                        v: inputs.next().unwrap(),
+                        o: outputs.next().unwrap(),
+                    });
+                    assert!(inputs.next().is_none());
+                    assert!(outputs.next().is_none());
+                    vec![]
+                }
                 _ => {
-                    print!("next is {op} ({arg:?})");
+                    print!("todo! {op} ({arg:?})");
                     for t in inputs {
                         print!(" {}{:?}", t.dt(), t.shape())
                     }
@@ -148,7 +169,8 @@ fn main() {
                         print!(" {}{:?}", t.dt(), t.shape())
                     }
                     println!();
-                    break;
+                    // break;
+                    deps
                 }
             }
         }
@@ -157,6 +179,17 @@ fn main() {
 
     times.push("build cuda graph");
     println!("{times}");
+}
+
+enum Exec<'ctx> {
+    Graph(cuda::GraphExec<'ctx>),
+    Attention {
+        dh: usize,
+        q: Tensor<*const VirByte, 2>,
+        k: Tensor<*const VirByte, 2>,
+        v: Tensor<*const VirByte, 2>,
+        o: Tensor<*const VirByte, 2>,
+    },
 }
 
 #[derive(Default)]
