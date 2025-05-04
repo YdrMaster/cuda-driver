@@ -8,6 +8,7 @@
 };
 use context_spore::AsRaw;
 use std::{
+    mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     ptr::null_mut,
     slice::{from_raw_parts, from_raw_parts_mut},
@@ -125,7 +126,13 @@ impl PhyMem {
     }
 }
 
-pub struct MappedMem {
+#[repr(transparent)]
+pub struct MappedMem(ManuallyDrop<Internal>);
+
+/// 需要一个内部结构来控制何时自动释放。
+///
+/// [`MappedMem`] 自动释放时，[`Internal`] 的两个成员递归释放。主动解映射时，[`Internal`] 的成员被取出，不释放。
+struct Internal {
     vir: VirMem,
     phy: Arc<PhyMem>,
 }
@@ -144,7 +151,7 @@ impl VirMem {
         };
         driver!(cuMemSetAccess(self.ptr, phy.len, &desc, 1));
 
-        MappedMem { vir: self, phy }
+        MappedMem(ManuallyDrop::new(Internal { vir: self, phy }))
     }
 
     pub fn map_on(self, dev: &Device) -> MappedMem {
@@ -155,17 +162,17 @@ impl VirMem {
 
 impl Drop for MappedMem {
     fn drop(&mut self) {
-        driver!(cuMemUnmap(self.vir.ptr, self.phy.len))
+        driver!(cuMemUnmap(self.0.vir.ptr, self.0.phy.len));
+        unsafe { ManuallyDrop::drop(&mut self.0) }
     }
 }
 
 impl MappedMem {
-    pub fn unmap(self) -> (VirMem, Arc<PhyMem>) {
-        let vir = VirMem {
-            ptr: self.vir.ptr,
-            len: self.vir.len,
-        };
-        (vir, self.phy.clone())
+    pub fn unmap(mut self) -> (VirMem, Arc<PhyMem>) {
+        driver!(cuMemUnmap(self.0.vir.ptr, self.0.phy.len));
+        let Internal { vir, phy } = unsafe { ManuallyDrop::take(&mut self.0) };
+        std::mem::forget(self);
+        (vir, phy)
     }
 }
 
@@ -173,14 +180,14 @@ impl Deref for MappedMem {
     type Target = [DevByte];
     #[inline]
     fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.vir.ptr as _, self.phy.len) }
+        unsafe { from_raw_parts(self.0.vir.ptr as _, self.0.phy.len) }
     }
 }
 
 impl DerefMut for MappedMem {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { from_raw_parts_mut(self.vir.ptr as _, self.phy.len) }
+        unsafe { from_raw_parts_mut(self.0.vir.ptr as _, self.0.phy.len) }
     }
 }
 
