@@ -1,5 +1,4 @@
-﻿use super::{Modules, Operator, macros::*};
-use crate::op::{ModuleKey, cuda_type};
+﻿use super::{ModuleKey, Modules, Operator, cuda_type, macros::*};
 use cuda::{Device, Graph, GraphNode, VirByte, params};
 use nn::Arg;
 use std::ffi::c_uint;
