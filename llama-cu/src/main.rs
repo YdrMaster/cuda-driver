@@ -116,13 +116,9 @@ fn main() {
         .into_exec();
     times.push("into exec");
 
-    println!("{times}");
-
-    // let mut graph = cuda::Graph::new();
-    // let mut computation = Vec::new();
     dev.context().apply(|ctx| {
         let mut modules = op::Modules::new(ctx);
-        let mut graph = cuda::Graph::new();
+        let graph = cuda::Graph::new();
         let mut nodes = vec![];
         for Exec {
             node,
@@ -141,14 +137,26 @@ fn main() {
                 "embedding" => add_to_graph!(Embedding),
                 "rms-norm" => add_to_graph!(RmsNorm),
                 "linear" => add_to_graph!(Linear),
+                "empty" => deps,
                 _ => {
-                    println!("next is {op}");
+                    print!("next is {op} ({arg:?})");
+                    for t in inputs {
+                        print!(" {}{:?}", t.dt(), t.shape())
+                    }
+                    print!(" ->");
+                    for t in outputs {
+                        print!(" {}{:?}", t.dt(), t.shape())
+                    }
+                    println!();
                     break;
                 }
-            };
+            }
         }
-        graph.save_dot(std::env::current_dir().unwrap().join("graph.dot"));
-    })
+        graph.save_dot(std::env::current_dir().unwrap().join("graph.dot"))
+    });
+
+    times.push("build cuda graph");
+    println!("{times}");
 }
 
 #[derive(Default)]
