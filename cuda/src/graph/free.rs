@@ -4,7 +4,7 @@ use context_spore::AsRaw;
 use std::{marker::PhantomData, ptr::null_mut};
 
 impl Graph {
-    pub fn add_free_node_with_params<'a>(
+    pub fn free<'a>(
         &self,
         ptr: *const VirByte,
         deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
@@ -20,5 +20,15 @@ impl Graph {
             ptr as _,
         ));
         MemFreeNode(node, PhantomData)
+    }
+
+    pub fn add_free_node<'a>(
+        &self,
+        node: &MemFreeNode,
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
+    ) -> MemFreeNode {
+        let mut ptr = 0;
+        driver!(cuGraphMemFreeNodeGetParams(node.as_raw(), &mut ptr));
+        self.free(ptr as _, deps)
     }
 }

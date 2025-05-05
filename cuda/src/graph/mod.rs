@@ -264,7 +264,7 @@ mod test {
             )
         );
         // √
-        driver!(cuGraphDestroy(graph));
+        driver!(cuGraphDestroy(graph))
     }
 
     #[test]
