@@ -13,13 +13,14 @@ pub trait Computation {
 
 #[derive(Clone, Copy)]
 pub struct GemmScheme<T, Compute> {
-    alpha: T,
-    beta: T,
-    _compute: PhantomData<Compute>,
+    alpha: Compute,
+    beta: Compute,
+    _phantom: PhantomData<T>,
 }
 
 impl<T, Compute> GemmScheme<T, Compute>
 where
+    Compute: Copy,
     Self: Computation,
 {
     pub fn to_value(&self) -> ComputationValue {
@@ -30,18 +31,17 @@ where
             compute: self.compute_type(),
             data: {
                 let mut scalar = [0u64; 2];
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        (&raw const self.alpha).cast::<u8>(),
-                        scalar[0..].as_mut_ptr().cast(),
-                        size_of::<T>(),
-                    );
-                    std::ptr::copy_nonoverlapping(
-                        (&raw const self.beta).cast::<u8>(),
-                        scalar[1..].as_mut_ptr().cast(),
-                        size_of::<T>(),
-                    );
+                fn copy<T: Copy>(data: T, ptr: &mut [u64]) {
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            (&raw const data).cast::<u8>(),
+                            ptr.as_mut_ptr().cast(),
+                            size_of_val(&data),
+                        )
+                    }
                 }
+                copy(self.alpha, &mut scalar[0..]);
+                copy(self.beta, &mut scalar[1..]);
                 scalar
             },
         }
@@ -50,12 +50,12 @@ where
 
 macro_rules! impl_gemm_scheme {
     ($ty:ty => $f:expr) => {
-        impl<Compute> GemmScheme<$ty, Compute> {
+        impl<T> GemmScheme<T, $ty> {
             pub fn new(alpha: f64, beta: f64) -> Self {
                 Self {
                     alpha: $f(alpha),
                     beta: $f(beta),
-                    _compute: PhantomData,
+                    _phantom: PhantomData,
                 }
             }
         }
