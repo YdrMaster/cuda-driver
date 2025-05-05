@@ -1,6 +1,9 @@
-﻿mod host_fn;
+﻿mod free;
+mod host_fn;
 mod kernel;
+mod malloc;
 mod memcpy;
+mod memset;
 
 use crate::{
     CurrentCtx, Stream,
@@ -227,6 +230,12 @@ impl AsRaw for GraphNode<'_> {
             ExtSemasWait
         }
     }
+}
+
+fn collect_dependencies<'a>(
+    deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
+) -> Box<[CUgraphNode]> {
+    deps.into_iter().map(|n| unsafe { n.as_raw() }).collect()
 }
 
 #[cfg(test)]

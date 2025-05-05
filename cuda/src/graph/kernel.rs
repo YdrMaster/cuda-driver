@@ -1,15 +1,15 @@
-﻿use super::{Graph, GraphNode, KernelNode};
+﻿use super::{Graph, GraphNode, KernelNode, collect_dependencies};
 use crate::{Dim3, KernelFn, bindings::CUDA_KERNEL_NODE_PARAMS};
 use context_spore::AsRaw;
 use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 impl Graph {
-    pub fn add_kernel_call(
+    pub fn add_kernel_call<'a>(
         &self,
         f: &KernelFn,
         attrs: (impl Into<Dim3>, impl Into<Dim3>, usize),
         params: &[*const c_void],
-        dependencies: &[GraphNode],
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> KernelNode {
         let (grid, block, shared_mem) = attrs;
         let grid = grid.into();
@@ -29,33 +29,34 @@ impl Graph {
             ctx: null_mut(),
         };
 
-        self.add_kernel_node_with_params(&params, dependencies)
+        self.add_kernel_node_with_params(&params, deps)
     }
 
-    pub fn add_kernel_node(&self, node: &KernelNode, dependencies: &[GraphNode]) -> KernelNode {
+    pub fn add_kernel_node<'a>(
+        &self,
+        node: &KernelNode,
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
+    ) -> KernelNode {
         let mut params = unsafe { std::mem::zeroed() };
         driver!(cuGraphKernelNodeGetParams_v2(node.as_raw(), &mut params));
 
-        self.add_kernel_node_with_params(&params, dependencies)
+        self.add_kernel_node_with_params(&params, deps)
     }
 
-    pub fn add_kernel_node_with_params(
+    pub fn add_kernel_node_with_params<'a>(
         &self,
         params: &CUDA_KERNEL_NODE_PARAMS,
-        dependencies: &[GraphNode],
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> KernelNode {
-        let dependencies = dependencies
-            .iter()
-            .map(|n| unsafe { n.as_raw() })
-            .collect::<Box<_>>();
+        let deps = collect_dependencies(deps);
 
         let mut node = null_mut();
         driver!(cuGraphAddKernelNode_v2(
             &mut node,
             self.as_raw(),
-            dependencies.as_ptr(),
-            dependencies.len(),
-            params
+            deps.as_ptr(),
+            deps.len(),
+            params,
         ));
         KernelNode(node, PhantomData)
     }

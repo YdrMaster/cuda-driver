@@ -1,4 +1,4 @@
-﻿use super::{Graph, GraphNode, MemcpyNode};
+﻿use super::{Graph, GraphNode, MemcpyNode, collect_dependencies};
 use crate::{
     DevByte,
     bindings::{CUDA_MEMCPY3D, CUmemorytype},
@@ -39,11 +39,11 @@ const CFG: CUDA_MEMCPY3D = CUDA_MEMCPY3D {
 };
 
 impl Graph {
-    pub fn add_memcpy_d2d(
+    pub fn add_memcpy_d2d<'a>(
         &self,
         dst: &mut [DevByte],
         src: &[DevByte],
-        dependencies: &[GraphNode],
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> MemcpyNode {
         assert_eq!(size_of_val(dst), size_of_val(src));
         self.add_memcpy_node_with_params(
@@ -55,36 +55,37 @@ impl Graph {
                 WidthInBytes: size_of_val(dst),
                 ..CFG
             },
-            dependencies,
+            deps,
         )
     }
 
-    pub fn add_memcpy_node(&self, node: &MemcpyNode, dependencies: &[GraphNode]) -> MemcpyNode {
+    pub fn add_memcpy_node<'a>(
+        &self,
+        node: &MemcpyNode,
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
+    ) -> MemcpyNode {
         let mut params = MaybeUninit::uninit();
         driver!(cuGraphMemcpyNodeGetParams(
             node.as_raw(),
             params.as_mut_ptr()
         ));
 
-        self.add_memcpy_node_with_params(unsafe { params.assume_init_ref() }, dependencies)
+        self.add_memcpy_node_with_params(unsafe { params.assume_init_ref() }, deps)
     }
 
-    pub fn add_memcpy_node_with_params(
+    pub fn add_memcpy_node_with_params<'a>(
         &self,
         params: &CUDA_MEMCPY3D,
-        dependencies: &[GraphNode],
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> MemcpyNode {
-        let dependencies = dependencies
-            .iter()
-            .map(|n| unsafe { n.as_raw() })
-            .collect::<Box<_>>();
+        let deps = collect_dependencies(deps);
 
         let mut node = null_mut();
         driver!(cuGraphAddMemcpyNode(
             &mut node,
             self.as_raw(),
-            dependencies.as_ptr(),
-            dependencies.len(),
+            deps.as_ptr(),
+            deps.len(),
             params,
             null_mut(),
         ));
@@ -190,10 +191,10 @@ mod test {
         dev.context().apply(|ctx| {
             memcpy_h2d(src, &origin);
 
-            ctx.instantiate(&graph).launch(&ctx.stream());
+            ctx.instantiate(graph).launch(&ctx.stream());
 
             let mut host = vec![0u64; origin.len()];
-            memcpy_d2h(&mut host, &dst);
+            memcpy_d2h(&mut host, dst);
             assert_eq!(host, &*origin)
         })
     }

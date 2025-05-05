@@ -1,21 +1,31 @@
-﻿use super::{Graph, GraphNode, HostFnNode};
-use crate::{
-    AsRaw,
-    bindings::{CUDA_HOST_NODE_PARAMS, CUhostFn},
-};
+﻿use super::{Graph, GraphNode, HostFnNode, collect_dependencies};
+use crate::bindings::{CUDA_HOST_NODE_PARAMS, CUhostFn};
+use context_spore::AsRaw;
 use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 impl Graph {
-    pub fn add_host_node(
+    pub fn add_host_node_with_rust_fn<'a>(
+        &self,
+        host_fn: impl Fn() + Send + Sync + 'static,
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
+    ) -> HostFnNode {
+        extern "C" fn c_host_fn(user_data: *mut c_void) {
+            let host_fn = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn()>) };
+            host_fn();
+        }
+        let boxed_closure: Box<dyn Fn()> = Box::new(host_fn);
+
+        let user_data = Box::into_raw(Box::new(boxed_closure));
+        self.add_host_node(Some(c_host_fn), user_data as *mut c_void, deps)
+    }
+
+    pub fn add_host_node<'a>(
         &self,
         host_fn: CUhostFn,
         user_data: *mut c_void,
-        dependencies: &[GraphNode],
+        deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> HostFnNode {
-        let dependencies = dependencies
-            .iter()
-            .map(|n| unsafe { n.as_raw() })
-            .collect::<Box<_>>();
+        let deps = collect_dependencies(deps);
 
         let cuda_host_node_params = CUDA_HOST_NODE_PARAMS {
             fn_: host_fn,
@@ -25,26 +35,11 @@ impl Graph {
         driver!(cuGraphAddHostNode(
             &mut node,
             self.as_raw(),
-            dependencies.as_ptr(),
-            dependencies.len(),
+            deps.as_ptr(),
+            deps.len(),
             &cuda_host_node_params,
         ));
         HostFnNode(node, PhantomData)
-    }
-
-    pub fn add_host_node_with_rust_fn(
-        &self,
-        host_fn: impl Fn() + Send + Sync + 'static,
-        dependencies: &[GraphNode],
-    ) -> HostFnNode {
-        extern "C" fn c_host_fn(user_data: *mut c_void) {
-            let host_fn = unsafe { Box::from_raw(user_data as *mut Box<dyn Fn()>) };
-            host_fn();
-        }
-        let boxed_closure: Box<dyn Fn()> = Box::new(host_fn);
-
-        let user_data = Box::into_raw(Box::new(boxed_closure));
-        self.add_host_node(Some(c_host_fn), user_data as *mut c_void, dependencies)
     }
 }
 
