@@ -63,7 +63,8 @@ fn main() {
     assert!(cuda::init().is_ok());
     let dev = Device::new(0);
     let minimum = dev.mem_prop().granularity_minimum();
-    let (edges, weight_vir, weight_phy) = dev.context().apply(|ctx| {
+    let mut mapped = VirMem::new(ranges.size().div_ceil(minimum) * minimum, 0).map_on(&dev);
+    let edges = dev.context().apply(|ctx| {
         let mut loader = WeightLoader::new(
             ranges
                 .sizes()
@@ -72,8 +73,7 @@ fn main() {
         );
 
         let stream = ctx.stream();
-        let mut mapped = VirMem::new(ranges.size().div_ceil(minimum) * minimum, 0).map_on(&dev);
-        let edges = edges
+        edges
             .into_iter()
             .map(|nn::Edge { meta, external }| nn::Edge {
                 meta,
@@ -87,10 +87,9 @@ fn main() {
                     }),
                 }),
             })
-            .collect::<Box<_>>();
-        let (weights, physical) = mapped.unmap();
-        (edges, weights, physical)
+            .collect::<Box<_>>()
     });
+    let (weight_vir, weight_phy) = mapped.unmap();
     times.push("cuda");
 
     let graph = nn::Graph(graph::Graph { topo, nodes, edges }).lower(&[("n", 5)].into(), |t| t);
@@ -115,6 +114,12 @@ fn main() {
         )
         .into_exec();
     times.push("into exec");
+
+    // memcpy node 要求当时虚地址有对应的物理页
+    let workspace_mapped = workspace_vir
+        .into_iter()
+        .map(|vir| vir.map_on(&dev))
+        .collect::<Box<_>>();
 
     dev.context().apply(|ctx| {
         let mut modules = op::Modules::new(ctx);
@@ -171,16 +176,20 @@ fn main() {
                         print!(" {}{:?}", t.dt(), t.shape())
                     }
                     println!();
-                    // break;
-                    deps
+                    break;
                 }
             }
         }
-        graph.save_dot(std::env::current_dir().unwrap().join("graph.dot"))
+        exec_.push(Exec::Graph(ctx.instantiate(&graph)))
     });
 
+    let _workspace_vir = workspace_mapped
+        .into_iter()
+        .map(|mapped| mapped.unmap().0)
+        .collect::<Box<_>>();
+
     times.push("build cuda graph");
-    println!("{times}");
+    println!("{times}")
 }
 
 enum Exec<'ctx> {

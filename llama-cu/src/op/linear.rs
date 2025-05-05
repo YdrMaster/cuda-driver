@@ -1,6 +1,6 @@
-﻿use super::{Modules, Operator, macros::destruct};
+﻿use super::{Deps, Modules, Operator, macros::destruct};
 use cublas::{Cublas, GemmScheme};
-use cuda::{Graph, GraphNode, VirByte};
+use cuda::{AsRaw, DevByte, Graph, GraphNode, VirByte, driver};
 use ggus::ggml_quants::f16;
 use nn::Arg;
 use std::mem::swap;
@@ -27,6 +27,11 @@ impl Operator for Linear {
         let Some(Arg::Bool(residual)) = arg else {
             panic!()
         };
+
+        let dt = y.dt();
+        assert_eq!(x.dt(), dt);
+
+        let mut deps = Deps::Borrowed(deps);
         let (w, beta) = if residual {
             // 残差连接
             let residual = inputs.next().unwrap();
@@ -34,7 +39,18 @@ impl Operator for Linear {
             if let Some(b) = inputs.next() {
                 todo!()
             } else {
-                (w, 0.)
+                assert!(y.is_contiguous());
+                assert!(residual.is_contiguous());
+
+                let len = residual.shape().iter().fold(dt.nbytes(), |acc, d| acc * d);
+                let residual = graph.add_memcpy_d2d(
+                    unsafe { std::slice::from_raw_parts_mut(*y.get() as _, len) },
+                    unsafe { std::slice::from_raw_parts(*residual.get() as _, len) },
+                    &deps,
+                );
+                deps = Deps::Owned(vec![residual.into()]);
+
+                (w, 1.)
             }
         } else {
             let w = inputs.next().unwrap();
@@ -44,8 +60,7 @@ impl Operator for Linear {
                 (w, 0.)
             }
         };
-        let dt = y.dt();
-        assert_eq!(x.dt(), dt);
+
         assert_eq!(w.dt(), dt);
         let layout = GemmLayout::new(
             &(dt, y.layout().clone()),
@@ -92,7 +107,7 @@ impl Operator for Linear {
         let GraphNode::Kernel(node) = node else {
             panic!()
         };
-        vec![graph.add_kernel_node(&node, deps).into()]
+        vec![graph.add_kernel_node(&node, &deps).into()]
     }
 }
 

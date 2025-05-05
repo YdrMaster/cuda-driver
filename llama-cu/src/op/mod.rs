@@ -6,7 +6,7 @@ mod swiglu;
 
 use cuda::{CurrentCtx, Graph, GraphNode, Module, Ptx, VirByte};
 use nn::Tensor;
-use std::{collections::HashMap, usize};
+use std::{collections::HashMap, ops::Deref, usize};
 use tensor::digit_layout::{DigitLayout, types};
 
 pub use embedding::Embedding;
@@ -55,10 +55,27 @@ pub enum ModuleKey {
     Size(usize),
 }
 
+enum Deps<'a> {
+    Borrowed(&'a [GraphNode<'a>]),
+    Owned(Vec<GraphNode<'a>>),
+}
+
+impl<'a> Deref for Deps<'a> {
+    type Target = [GraphNode<'a>];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Borrowed(nodes) => nodes,
+            Self::Owned(nodes) => &nodes,
+        }
+    }
+}
+
 fn cuda_type(ty: DigitLayout) -> &'static str {
     match ty {
         types::U32 => "unsigned int",
         types::F32 => "float",
+        types::F16 => "half",
         _ => todo!(),
     }
 }
