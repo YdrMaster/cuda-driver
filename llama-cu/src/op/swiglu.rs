@@ -1,20 +1,18 @@
-use super::{ModuleKey, Modules, Operator, cuda_type, macros::*};
-use cuda::{Graph, GraphNode, VirByte, params};
-
+use super::{Handle, ModuleKey, Operator, cuda_type, macros::*};
+use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};
 
 pub struct Swiglu;
 
 impl Operator for Swiglu {
-    fn add_to_graph<'a, const N: usize>(
-        graph: &'a Graph,
-        deps: &[GraphNode<'a>],
-        modules: &mut Modules,
+    fn launch<'a, const N: usize>(
+        handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
         outputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
-    ) -> Vec<GraphNode<'a>> {
+        stream: &Stream,
+    ) {
         if arg.is_some() {
             panic!("Swiglu不需要额外参数");
         }
@@ -56,11 +54,11 @@ impl Operator for Swiglu {
         let code = code(dt);
 
         // 获取最大线程数
-        let max_threads_block = modules.ctx.dev().block_limit().max_threads;
+        let max_threads_block = handle.ctx.dev().block_limit().max_threads;
 
         // 编译内核
         let key = [ModuleKey::Text("swiglu"), ModuleKey::Type(dt)].into_iter();
-        let module = modules.compile(key.collect(), || code);
+        let module = handle.compile(key.collect(), || code);
         let kernel = module.get_kernel(c"swiglu");
 
         // 准备参数
@@ -77,16 +75,11 @@ impl Operator for Swiglu {
         let block = gcd(max_threads_block, d);
 
         // 启动内核
-        vec![
-            graph
-                .add_kernel_call(
-                    &kernel,
-                    (n as c_uint, (d / block) as c_uint, block),
-                    &params.to_ptrs(),
-                    deps,
-                )
-                .into(),
-        ]
+        stream.launch(
+            &kernel,
+            (n as c_uint, (d / block) as c_uint, block),
+            &params.to_ptrs(),
+        );
     }
 }
 

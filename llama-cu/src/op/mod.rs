@@ -4,9 +4,10 @@ mod rms_norm;
 mod rope;
 mod swiglu;
 
-use cuda::{CurrentCtx, Graph, GraphNode, Module, Ptx, VirByte};
+use cublas::Cublas;
+use cuda::{CurrentCtx, Module, Ptx, Stream, VirByte};
 use nn::Tensor;
-use std::{collections::HashMap, ops::Deref, usize};
+use std::{collections::HashMap, usize};
 use tensor::digit_layout::{DigitLayout, types};
 
 pub use embedding::Embedding;
@@ -16,25 +17,26 @@ pub use rope::Rope;
 pub use swiglu::Swiglu;
 
 pub trait Operator {
-    fn add_to_graph<'a, const N: usize>(
-        graph: &'a Graph,
-        deps: &[GraphNode<'a>],
-        modules: &mut Modules,
+    fn launch<'a, const N: usize>(
+        handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
         outputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
-    ) -> Vec<GraphNode<'a>>;
+        stream: &Stream,
+    );
 }
 
-pub struct Modules<'ctx> {
+pub struct Handle<'ctx> {
     ctx: &'ctx CurrentCtx,
+    cublas: Cublas<'ctx>,
     modules: HashMap<Box<[ModuleKey]>, Module<'ctx>>,
 }
 
-impl<'ctx> Modules<'ctx> {
+impl<'ctx> Handle<'ctx> {
     pub fn new(ctx: &'ctx CurrentCtx) -> Self {
         Self {
             ctx,
+            cublas: Cublas::new(ctx),
             modules: HashMap::new(),
         }
     }
@@ -53,22 +55,6 @@ pub enum ModuleKey {
     Text(&'static str),
     Type(DigitLayout),
     Size(usize),
-}
-
-enum Deps<'a> {
-    Borrowed(&'a [GraphNode<'a>]),
-    Owned(Vec<GraphNode<'a>>),
-}
-
-impl<'a> Deref for Deps<'a> {
-    type Target = [GraphNode<'a>];
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(nodes) => nodes,
-            Self::Owned(nodes) => &nodes,
-        }
-    }
 }
 
 fn cuda_type(ty: DigitLayout) -> &'static str {

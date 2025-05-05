@@ -1,5 +1,5 @@
-use super::{ModuleKey, Modules, Operator, cuda_type, macros::*};
-use cuda::{Graph, GraphNode, VirByte, params};
+use super::{Handle, ModuleKey, Operator, cuda_type, macros::*};
+use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{
     Tensor,
@@ -9,14 +9,13 @@ use tensor::{
 pub struct Rope;
 
 impl Operator for Rope {
-    fn add_to_graph<'a, const N: usize>(
-        graph: &'a Graph,
-        deps: &[GraphNode<'a>],
-        modules: &mut Modules,
+    fn launch<'a, const N: usize>(
+        handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
         outputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
-    ) -> Vec<GraphNode<'a>> {
+        stream: &Stream,
+    ) {
         if arg.is_some() {
             panic!("Rope不需要额外参数");
         }
@@ -61,7 +60,7 @@ impl Operator for Rope {
         // 计算线程块配置，参考mod.rs中的逻辑
         let dh_div_2 = dh / 2;
         // 先获取最大线程数，避免后面借用冲突
-        let max_threads_block = modules.ctx.dev().block_limit().max_threads;
+        let max_threads_block = handle.ctx.dev().block_limit().max_threads;
 
         // 确保线程块大小不超过设备限制
         assert!(max_threads_block >= dh_div_2);
@@ -82,7 +81,7 @@ impl Operator for Rope {
             ModuleKey::Type(dt_p),
         ]
         .into_iter();
-        let module = modules.compile(key.collect(), || code);
+        let module = handle.compile(key.collect(), || code);
         let kernel = module.get_kernel(c"rope");
 
         let params = params![
@@ -100,20 +99,15 @@ impl Operator for Rope {
         // 参考mod.rs中的kernel配置方式
         // gridDim = (n, nh_h)
         // blockDim = (dh_div_2, nh_l)
-        vec![
-            graph
-                .add_kernel_call(
-                    &kernel,
-                    (
-                        (n as c_uint, nh_h as c_uint),
-                        (nh_l as c_uint, dh_div_2 as c_uint),
-                        0,
-                    ),
-                    &params.to_ptrs(),
-                    deps,
-                )
-                .into(),
-        ]
+        stream.launch(
+            &kernel,
+            (
+                (n as c_uint, nh_h as c_uint),
+                (nh_l as c_uint, dh_div_2 as c_uint),
+                0,
+            ),
+            &params.to_ptrs(),
+        );
     }
 }
 

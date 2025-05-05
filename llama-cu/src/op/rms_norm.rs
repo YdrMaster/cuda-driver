@@ -1,5 +1,5 @@
-﻿use super::{ModuleKey, Modules, Operator, cuda_type, macros::*};
-use cuda::{Device, Graph, GraphNode, VirByte, params};
+﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*};
+use cuda::{Device, Stream, VirByte, params};
 use nn::Arg;
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};
@@ -7,14 +7,13 @@ use tensor::{Tensor, digit_layout::DigitLayout};
 pub struct RmsNorm;
 
 impl Operator for RmsNorm {
-    fn add_to_graph<'a, const N: usize>(
-        graph: &'a Graph,
-        deps: &[GraphNode<'a>],
-        modules: &mut Modules,
+    fn launch<'a, const N: usize>(
+        handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
         outputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
-    ) -> Vec<GraphNode<'a>> {
+        stream: &Stream,
+    ) {
         destruct!([x, w] = inputs);
         destruct!([y] = outputs);
         let Some(Arg::Float(epsilon)) = arg else {
@@ -31,7 +30,7 @@ impl Operator for RmsNorm {
         assert_eq!(d_, d);
         assert_eq!(d__, d);
 
-        let (code, block_dim) = code(&modules.ctx.dev(), ta, tw, d);
+        let (code, block_dim) = code(&handle.ctx.dev(), ta, tw, d);
         let key = [
             ModuleKey::Text("rms-norm"),
             ModuleKey::Type(ta),
@@ -39,7 +38,7 @@ impl Operator for RmsNorm {
             ModuleKey::Size(d),
         ]
         .into_iter();
-        let module = modules.compile(key.collect(), || code);
+        let module = handle.compile(key.collect(), || code);
         let kernel = module.get_kernel(c"rms_norm");
 
         let params = params![
@@ -51,16 +50,11 @@ impl Operator for RmsNorm {
             epsilon as f32
         ];
 
-        vec![
-            graph
-                .add_kernel_call(
-                    &kernel,
-                    (n as c_uint, block_dim as c_uint, 0),
-                    &params.to_ptrs(),
-                    deps,
-                )
-                .into(),
-        ]
+        stream.launch(
+            &kernel,
+            (n as c_uint, block_dim as c_uint, 0),
+            &params.to_ptrs(),
+        );
     }
 }
 

@@ -1,6 +1,6 @@
-﻿use super::{Deps, Modules, Operator, macros::destruct};
-use cublas::{Cublas, GemmScheme};
-use cuda::{AsRaw, DevByte, Graph, GraphNode, VirByte, driver};
+﻿use super::{Handle, Operator, macros::destruct};
+use cublas::GemmScheme;
+use cuda::{Stream, VirByte};
 use ggus::ggml_quants::f16;
 use nn::Arg;
 use std::mem::swap;
@@ -13,14 +13,13 @@ use tensor::{
 pub struct Linear;
 
 impl Operator for Linear {
-    fn add_to_graph<'a, const N: usize>(
-        graph: &'a Graph,
-        deps: &[GraphNode<'a>],
-        modules: &mut Modules,
-        arg: Option<Arg>,
+    fn launch<'a, const N: usize>(
+        handle: &mut Handle,
+        arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
         outputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
-    ) -> Vec<GraphNode<'a>> {
+        stream: &Stream,
+    ) {
         destruct!([y] = outputs);
         let mut inputs = inputs.into_iter();
         let x = inputs.next().unwrap();
@@ -31,7 +30,6 @@ impl Operator for Linear {
         let dt = y.dt();
         assert_eq!(x.dt(), dt);
 
-        let mut deps = Deps::Borrowed(deps);
         let (w, beta) = if residual {
             // 残差连接
             let residual = inputs.next().unwrap();
@@ -43,12 +41,10 @@ impl Operator for Linear {
                 assert!(residual.is_contiguous());
 
                 let len = residual.shape().iter().fold(dt.nbytes(), |acc, d| acc * d);
-                let residual = graph.add_memcpy_d2d(
+                stream.memcpy_d2d(
                     unsafe { std::slice::from_raw_parts_mut(*y.get() as _, len) },
                     unsafe { std::slice::from_raw_parts(*residual.get() as _, len) },
-                    &deps,
                 );
-                deps = Deps::Owned(vec![residual.into()]);
 
                 (w, 1.)
             }
@@ -68,9 +64,7 @@ impl Operator for Linear {
             &(dt, w.layout().transpose(&[1, 0]).clone()),
         );
 
-        let mut cublas = Cublas::new(modules.ctx);
-        let stream = modules.ctx.stream().capture();
-        cublas.set_stream(&stream);
+        handle.cublas.set_stream(&stream);
         let scalar = match dt {
             types::F16 => GemmScheme::<f16, f32>::new(1., beta).to_value(),
             types::F32 => GemmScheme::<f32, f32>::new(1., beta).to_value(),
@@ -85,7 +79,7 @@ impl Operator for Linear {
         match layout.batch {
             0 => unreachable!(),
             1 => unsafe {
-                cublas.gemm(
+                handle.cublas.gemm(
                     layout.m,
                     layout.n,
                     layout.k,
@@ -102,12 +96,6 @@ impl Operator for Linear {
             },
             n => todo!(),
         }
-        let sub = stream.end();
-        destruct!([node] = sub.nodes());
-        let GraphNode::Kernel(node) = node else {
-            panic!()
-        };
-        vec![graph.add_kernel_node(&node, &deps).into()]
     }
 }
 

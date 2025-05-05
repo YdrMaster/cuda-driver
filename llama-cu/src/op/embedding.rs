@@ -1,19 +1,18 @@
-﻿use super::{ModuleKey, Modules, Operator, cuda_type, macros::*, move_type};
-use cuda::{Graph, GraphNode, VirByte, params};
+﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, move_type};
+use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};
 
 pub struct Embedding;
 
 impl Operator for Embedding {
-    fn add_to_graph<'a, const N: usize>(
-        graph: &'a Graph,
-        deps: &[GraphNode<'a>],
-        modules: &mut Modules,
+    fn launch<'a, const N: usize>(
+        handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
         outputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
-    ) -> Vec<GraphNode<'a>> {
+        stream: &Stream,
+    ) {
         let None = arg else { panic!() };
         destruct!([token_embd, tokens] = inputs);
         destruct!([x] = outputs);
@@ -40,20 +39,15 @@ impl Operator for Embedding {
             ModuleKey::Size(unit),
         ]
         .into_iter();
-        let module = modules.compile(key.collect(), || code(unit, tidx));
+        let module = handle.compile(key.collect(), || code(unit, tidx));
         let kernel = module.get_kernel(c"embedding");
         let params = params![x.get(), token_embd.get(), tokens.get()];
 
-        vec![
-            graph
-                .add_kernel_call(
-                    &kernel,
-                    (n as c_uint, (line / unit) as c_uint, 0),
-                    &params.to_ptrs(),
-                    deps,
-                )
-                .into(),
-        ]
+        stream.launch(
+            &kernel,
+            (n as c_uint, (line / unit) as c_uint, 0),
+            &params.to_ptrs(),
+        );
     }
 }
 

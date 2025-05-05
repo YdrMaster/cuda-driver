@@ -122,9 +122,8 @@ fn main() {
         .collect::<Box<_>>();
 
     dev.context().apply(|ctx| {
-        let mut modules = op::Modules::new(ctx);
-        let mut graph = cuda::Graph::new();
-        let mut nodes = vec![];
+        let mut handle = op::Handle::new(ctx);
+        let mut stream = None;
         let mut exec_ = Vec::with_capacity(exec.len());
         for nn::Exec {
             node,
@@ -133,22 +132,28 @@ fn main() {
         } in exec
         {
             let Node { op, arg, .. } = node;
-            let deps = std::mem::take(&mut nodes);
             macro_rules! add_to_graph {
                 ($op:ident) => {
-                    op::$op::add_to_graph(&graph, &deps, &mut modules, arg, inputs, outputs)
+                    op::$op::launch(
+                        &mut handle,
+                        arg,
+                        inputs,
+                        outputs,
+                        stream.get_or_insert_with(|| ctx.stream().capture()),
+                    )
                 };
             }
-            nodes = match &*op {
+            match &*op {
                 "embedding" => add_to_graph!(Embedding),
                 "rms-norm" => add_to_graph!(RmsNorm),
                 "linear" => add_to_graph!(Linear),
                 "rope" => add_to_graph!(Rope),
                 "swiglu" => add_to_graph!(Swiglu),
-                "empty" => deps,
+                "empty" => {}
                 "attention" => {
-                    let graph = std::mem::replace(&mut graph, cuda::Graph::new());
-                    exec_.push(Exec::Graph(ctx.instantiate(&graph)));
+                    if let Some(stream) = stream.take() {
+                        exec_.push(Exec::Graph(ctx.instantiate(&stream.end())))
+                    }
 
                     let Some(nn::Arg::Int(dh)) = arg else {
                         panic!()
@@ -164,7 +169,6 @@ fn main() {
                     });
                     assert!(inputs.next().is_none());
                     assert!(outputs.next().is_none());
-                    vec![]
                 }
                 _ => {
                     print!("todo! {op} ({arg:?})");
@@ -180,7 +184,9 @@ fn main() {
                 }
             }
         }
-        exec_.push(Exec::Graph(ctx.instantiate(&graph)))
+        if let Some(stream) = stream.take() {
+            exec_.push(Exec::Graph(ctx.instantiate(&stream.end())))
+        }
     });
 
     let _workspace_vir = workspace_mapped
