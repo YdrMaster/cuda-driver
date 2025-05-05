@@ -153,7 +153,7 @@ impl KernelParams {
         }
     }
 
-    pub fn push<T: Copy>(&mut self, param: T) {
+    pub fn push<T: Copy + 'static>(&mut self, param: T) {
         // 计算参数对齐
         let mask = align_of::<T>() - 1;
         assert!(mask < align_of::<u64>());
