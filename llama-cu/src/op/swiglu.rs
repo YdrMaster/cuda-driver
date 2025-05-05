@@ -1,4 +1,4 @@
-use super::{Handle, ModuleKey, Operator, cuda_type, macros::*};
+use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, offset_ptr};
 use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};
@@ -63,11 +63,11 @@ impl Operator for Swiglu {
 
         // 准备参数
         let params = params![
-            out.get(),
+            offset_ptr(&out),
             stride_token_out,
-            gate.get(),
+            offset_ptr(&gate),
             stride_token_gate,
-            up.get(),
+            offset_ptr(&up),
             stride_token_up
         ];
 

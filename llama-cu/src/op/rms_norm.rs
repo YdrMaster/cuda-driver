@@ -1,7 +1,7 @@
-﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*};
+﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, offset_ptr};
 use cuda::{Device, Stream, VirByte, params};
 use nn::Arg;
-use std::ffi::c_uint;
+use std::ffi::{c_int, c_uint};
 use tensor::{Tensor, digit_layout::DigitLayout};
 
 pub struct RmsNorm;
@@ -41,12 +41,13 @@ impl Operator for RmsNorm {
         let module = handle.compile(key.collect(), || code);
         let kernel = module.get_kernel(c"rms_norm");
 
+        let unit = ta.nbytes() as isize;
         let params = params![
-            y.get(),
-            y.strides()[0],
-            x.get(),
-            x.strides()[0],
-            w.get(),
+            offset_ptr(&y),
+            (y.strides()[0] / unit) as c_int,
+            offset_ptr(&x),
+            (x.strides()[0] / unit) as c_int,
+            offset_ptr(&w),
             epsilon as f32
         ];
 

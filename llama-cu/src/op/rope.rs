@@ -1,4 +1,4 @@
-use super::{Handle, ModuleKey, Operator, cuda_type, macros::*};
+use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, offset_ptr};
 use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{
@@ -66,7 +66,7 @@ impl Operator for Rope {
         assert!(max_threads_block >= dh_div_2);
 
         // 计算合适的nh_l和nh_h
-        let max_nh_l = (max_threads_block / dh_div_2).min(d_head);
+        let max_nh_l = std::cmp::min(max_threads_block / dh_div_2, d_head);
         let nh_l = (1..=max_nh_l)
             .rev()
             .find(|nhl| d_head % nhl == 0)
@@ -85,15 +85,15 @@ impl Operator for Rope {
         let kernel = module.get_kernel(c"rope");
 
         let params = params![
-            y.get(),
+            offset_ptr(&y),
             stride_token_y,
             stride_head_y,
-            x.get(),
+            offset_ptr(&x),
             stride_token_x,
             stride_head_x,
-            pos.get(),
-            sin.get(),
-            cos.get()
+            offset_ptr(&pos),
+            offset_ptr(&sin),
+            offset_ptr(&cos)
         ];
 
         // 参考mod.rs中的kernel配置方式

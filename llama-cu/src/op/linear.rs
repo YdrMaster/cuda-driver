@@ -1,4 +1,4 @@
-﻿use super::{Handle, Operator, macros::destruct};
+﻿use super::{Handle, Operator, macros::destruct, offset_ptr};
 use cublas::GemmScheme;
 use cuda::{Stream, VirByte};
 use ggus::ggml_quants::f16;
@@ -71,11 +71,7 @@ impl Operator for Linear {
             types::F64 => GemmScheme::<f64, f64>::new(1., beta).to_value(),
             _ => todo!(),
         };
-        let (a, b) = if layout.ab_swap {
-            (w.get(), x.get())
-        } else {
-            (x.get(), w.get())
-        };
+        let (a, b) = if layout.ab_swap { (w, x) } else { (x, w) };
         match layout.batch {
             0 => unreachable!(),
             1 => unsafe {
@@ -84,13 +80,13 @@ impl Operator for Linear {
                     layout.n,
                     layout.k,
                     scalar,
-                    a.cast(),
+                    offset_ptr(&a).cast(),
                     layout.a_trans,
                     layout.a_ld,
-                    b.cast(),
+                    offset_ptr(&b).cast(),
                     layout.b_trans,
                     layout.b_ld,
-                    y.get().cast_mut().cast(),
+                    offset_ptr(&y).cast_mut().cast(),
                     layout.c_ld,
                 )
             },

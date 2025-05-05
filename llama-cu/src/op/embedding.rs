@@ -1,4 +1,4 @@
-﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, move_type};
+﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, move_type, offset_ptr};
 use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};
@@ -41,7 +41,7 @@ impl Operator for Embedding {
         .into_iter();
         let module = handle.compile(key.collect(), || code(unit, tidx));
         let kernel = module.get_kernel(c"embedding");
-        let params = params![x.get(), token_embd.get(), tokens.get()];
+        let params = params![offset_ptr(&x), offset_ptr(&token_embd), offset_ptr(&tokens)];
 
         stream.launch(
             &kernel,

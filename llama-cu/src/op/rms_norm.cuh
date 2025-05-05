@@ -11,11 +11,10 @@ static __device__ void padding(
     int const stride_x,
     Tw const *__restrict__ w_,
     float const epsilon) {
+
     auto y = y_ + blockIdx.x * stride_y + threadIdx.x;
-    float const
-        x
-        = x_[blockIdx.x * stride_x + threadIdx.x],
-        w = w_[threadIdx.x];
+    float const x = x_[blockIdx.x * stride_x + threadIdx.x];
+    float const w = w_[threadIdx.x];
 
     using BlockOp = cub::BlockReduce<float, BLOCK_SIZE>;
     __shared__ typename BlockOp::TempStorage temp_storage;
