@@ -1,18 +1,20 @@
 mod blob;
+mod exec;
+mod fmt;
 mod gguf;
 mod llama;
 mod loader;
 mod op;
 mod range_collector;
 
-use cuda::{Device, VirByte, VirMem};
+use cuda::{Device, VirByte, VirMem, memcpy_h2d};
+use exec::{Exec, merge_cuda_graph};
 use gguf::{GGufModel, map_files};
 use ggus::ggml_quants::digit_layout::types;
 use loader::WeightLoader;
-use nn::{Dim, GraphBuilder, Node, Tensor, TensorMeta, op as nn_op};
-use op::Operator;
+use nn::{Dim, GraphBuilder, TensorMeta, op as nn_op};
 use range_collector::RangeCollector;
-use std::{fmt, time::Instant};
+use std::time::Instant;
 
 // cargo run --release -- ../TinyStory-5M-v0.0-F32.gguf
 fn main() {
@@ -107,106 +109,116 @@ fn main() {
                 == workspace_vir[i - 1].as_ptr_range().end)
     );
     let ptr = workspace_vir[0].as_ptr();
-    let exec = graph
-        .lower(
-            |key| unsafe { ptr.byte_add(mem_range_map.map[&key].start) },
-            |&data| data,
-        )
-        .into_exec();
+    let graph = graph.lower(
+        |key| unsafe { ptr.byte_add(mem_range_map.map[&key].start) },
+        |&data| data,
+    );
+    let global_inputs = graph
+        .0
+        .topo
+        .global_inputs()
+        .map(|i| graph.0.edges[i].clone())
+        .collect::<Box<_>>();
+    let global_outputs = graph
+        .0
+        .topo
+        .global_outputs()
+        .iter()
+        .map(|&i| graph.0.edges[i].clone())
+        .collect::<Box<_>>();
+    let exec = graph.into_exec();
     times.push("into exec");
+    println!("{times}");
 
     // memcpy node 要求当时虚地址有对应的物理页
-    let workspace_mapped = workspace_vir
+    let _weight = weight_vir.map(weight_phy);
+    let _workspace = workspace_vir
         .into_iter()
         .map(|vir| vir.map_on(&dev))
         .collect::<Box<_>>();
 
     dev.context().apply(|ctx| {
-        let mut handle = op::Handle::new(ctx);
-        let mut stream = None;
-        let mut exec_ = Vec::with_capacity(exec.len());
-        for nn::Exec {
-            node,
-            inputs,
-            outputs,
-        } in exec
-        {
-            let Node { op, arg, .. } = node;
-            macro_rules! add_to_graph {
-                ($op:ident) => {
-                    op::$op::launch(
-                        &mut handle,
-                        arg,
-                        inputs,
-                        outputs,
-                        stream.get_or_insert_with(|| ctx.stream().capture()),
-                    )
-                };
-            }
-            match &*op {
-                "embedding" => add_to_graph!(Embedding),
-                "rms-norm" => add_to_graph!(RmsNorm),
-                "linear" => add_to_graph!(Linear),
-                "rope" => add_to_graph!(Rope),
-                "swiglu" => add_to_graph!(Swiglu),
-                "empty" => {}
-                "attention" => {
-                    if let Some(stream) = stream.take() {
-                        exec_.push(Exec::Graph(ctx.instantiate(&stream.end())))
-                    }
+        let tokens = [9038u32, 2501, 263, 931, 29892];
+        memcpy_h2d(
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    global_inputs[0].get().cast_mut().cast(),
+                    size_of_val(&tokens),
+                )
+            },
+            &tokens,
+        );
+        let tokens = [0u32, 1, 2, 3, 4];
+        memcpy_h2d(
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    global_inputs[1].get().cast_mut().cast(),
+                    size_of_val(&tokens),
+                )
+            },
+            &tokens,
+        );
+        //
+        // let mut handle = op::Handle::new(ctx);
+        // let stream = ctx.stream();
+        // for nn::Exec {
+        //     node,
+        //     inputs,
+        //     outputs,
+        // } in exec
+        // {
+        //     let nn::Node { op, arg, .. } = node;
+        //     use op::Operator;
+        //     match &*op {
+        //         "embedding" => op::Embedding::launch(&mut handle, arg, inputs, outputs, &stream),
+        //         "rms-norm" => op::RmsNorm::launch(&mut handle, arg, inputs, outputs, &stream),
+        //         "linear" => op::Linear::launch(&mut handle, arg, inputs, outputs, &stream),
+        //         "rope" => op::Rope::launch(&mut handle, arg, inputs, outputs, &stream),
+        //         "empty" => {}
+        //         "attention" => {
+        //             let mut inputs = inputs.into_iter();
+        //             let q = inputs.next().unwrap();
+        //             let k = inputs.next().unwrap();
+        //             let v = inputs.next().unwrap();
+        //             fmt::fmt(&q, ctx);
+        //             fmt::fmt(&k, ctx);
+        //             fmt::fmt(&v, ctx);
+        //             break;
+        //         }
+        //         _ => {
+        //             print!("todo! {op} ({arg:?})");
+        //             for t in inputs {
+        //                 print!(" {}{:?}", t.dt(), t.shape())
+        //             }
+        //             print!(" ->");
+        //             for t in outputs {
+        //                 print!(" {}{:?}", t.dt(), t.shape())
+        //             }
+        //             println!();
+        //             break;
+        //         }
+        //     }
+        // }
+        //
+        let (_handle, exec) = merge_cuda_graph(ctx, exec);
 
-                    let Some(nn::Arg::Int(dh)) = arg else {
-                        panic!()
-                    };
-                    let mut inputs = inputs.into_iter();
-                    let mut outputs = outputs.into_iter();
-                    exec_.push(Exec::Attention {
-                        dh: dh as _,
-                        q: inputs.next().unwrap(),
-                        k: inputs.next().unwrap(),
-                        v: inputs.next().unwrap(),
-                        o: outputs.next().unwrap(),
-                    });
-                    assert!(inputs.next().is_none());
-                    assert!(outputs.next().is_none());
-                }
-                _ => {
-                    print!("todo! {op} ({arg:?})");
-                    for t in inputs {
-                        print!(" {}{:?}", t.dt(), t.shape())
-                    }
-                    print!(" ->");
-                    for t in outputs {
-                        print!(" {}{:?}", t.dt(), t.shape())
-                    }
-                    println!();
+        times.push("build cuda graph");
+        println!("{times}");
+
+        let stream = ctx.stream();
+        for (i, exec) in exec.iter().enumerate() {
+            match exec {
+                Exec::Graph(graph) => graph.launch(&stream),
+                Exec::Attention { q, k, v, .. } => {
+                    println!("{i} attention");
+                    fmt::fmt(&q, ctx);
+                    fmt::fmt(&k, ctx);
+                    fmt::fmt(&v, ctx);
                     break;
                 }
             }
         }
-        if let Some(stream) = stream.take() {
-            exec_.push(Exec::Graph(ctx.instantiate(&stream.end())))
-        }
     });
-
-    let _workspace_vir = workspace_mapped
-        .into_iter()
-        .map(|mapped| mapped.unmap().0)
-        .collect::<Box<_>>();
-
-    times.push("build cuda graph");
-    println!("{times}")
-}
-
-enum Exec<'ctx> {
-    Graph(cuda::GraphExec<'ctx>),
-    Attention {
-        dh: usize,
-        q: Tensor<*const VirByte, 2>,
-        k: Tensor<*const VirByte, 2>,
-        v: Tensor<*const VirByte, 2>,
-        o: Tensor<*const VirByte, 2>,
-    },
 }
 
 #[derive(Default)]
@@ -214,13 +226,13 @@ enum Exec<'ctx> {
 struct TimeCollector(Vec<(String, Instant)>);
 
 impl TimeCollector {
-    pub fn push(&mut self, name: impl fmt::Display) {
+    pub fn push(&mut self, name: impl std::fmt::Display) {
         self.0.push((name.to_string(), Instant::now()))
     }
 }
 
-impl fmt::Display for TimeCollector {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for TimeCollector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name_width = self.0.iter().map(|(name, _)| name.len()).max().unwrap_or(0) + 2;
         for i in 1..self.0.len() {
             writeln!(
