@@ -1,22 +1,29 @@
-﻿use crate::op::{self, Handle, Operator};
+﻿use crate::{
+    macros::destruct,
+    op::{self, Handle, Operator},
+};
 use cuda::{CurrentCtx, VirByte};
 use nn::{Node, Tensor};
+use regex::Regex;
+use std::sync::LazyLock;
 
 pub(crate) enum Exec<'ctx> {
     Graph(cuda::GraphExec<'ctx>),
-    Attention {
-        dh: usize,
-        q: Tensor<*const VirByte, 2>,
-        k: Tensor<*const VirByte, 2>,
-        v: Tensor<*const VirByte, 2>,
-        o: Tensor<*const VirByte, 2>,
-    },
+    Attention(Box<Attention>),
 }
 
-pub fn merge_cuda_graph<'ctx>(
-    ctx: &'ctx CurrentCtx,
+pub(crate) struct Attention {
+    pub iblk: usize,
+    pub q: Tensor<*const VirByte, 2>,
+    pub k: Tensor<*const VirByte, 2>,
+    pub v: Tensor<*const VirByte, 2>,
+    pub o: Tensor<*const VirByte, 2>,
+}
+
+pub fn merge_cuda_graph(
+    ctx: &CurrentCtx,
     exec: impl IntoIterator<Item = nn::Exec<*const VirByte>>,
-) -> (Handle<'ctx>, Box<[Exec<'ctx>]>) {
+) -> (Handle, Box<[Exec]>) {
     let mut handle = op::Handle::new(ctx);
     let mut stream = None;
     let mut exec_ = Vec::new();
@@ -26,7 +33,7 @@ pub fn merge_cuda_graph<'ctx>(
         outputs,
     } in exec
     {
-        let Node { op, arg, .. } = node;
+        let Node { name, op, arg } = node;
         macro_rules! add_to_graph {
             ($op:ident) => {
                 op::$op::launch(
@@ -46,24 +53,38 @@ pub fn merge_cuda_graph<'ctx>(
             "swiglu" => add_to_graph!(Swiglu),
             "empty" => {}
             "attention" => {
+                static REGEX: LazyLock<Regex> =
+                    LazyLock::new(|| Regex::new(r"^Ω\.blk(\d+)\.attn:attention$").unwrap());
+
                 if let Some(stream) = stream.take() {
                     exec_.push(Exec::Graph(ctx.instantiate(&stream.end())))
                 }
 
+                destruct!([q, k, v] = inputs);
+                destruct!([o] = outputs);
                 let Some(nn::Arg::Int(dh)) = arg else {
                     panic!()
                 };
-                let mut inputs = inputs.into_iter();
-                let mut outputs = outputs.into_iter();
-                exec_.push(Exec::Attention {
-                    dh: dh as _,
-                    q: inputs.next().unwrap(),
-                    k: inputs.next().unwrap(),
-                    v: inputs.next().unwrap(),
-                    o: outputs.next().unwrap(),
-                });
-                assert!(inputs.next().is_none());
-                assert!(outputs.next().is_none());
+                let dh = dh as usize;
+
+                let transform = |t: Tensor<*const VirByte, 2>| {
+                    t.transform(|layout| {
+                        layout
+                            .tile_be(1, &[layout.shape()[1] / dh, dh])
+                            .transpose(&[1, 0])
+                    })
+                };
+
+                let iblk = {
+                    let (_, [iblk]) = REGEX.captures(&name).unwrap().extract();
+                    iblk.parse().unwrap()
+                };
+                let q = transform(q);
+                let k = transform(k);
+                let v = transform(v);
+                let o = transform(o);
+
+                exec_.push(Exec::Attention(Box::new(Attention { iblk, q, k, v, o })))
             }
             _ => {
                 print!("todo! {op} ({arg:?})");

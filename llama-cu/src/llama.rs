@@ -3,7 +3,7 @@ use ggus::GGufMetaMapExt;
 use nn::Tensor;
 use tensor::digit_layout::types;
 
-pub fn init<'a>(gguf: &'a mut GGufModel) -> nn::LLaMA<String> {
+pub fn init(gguf: &mut GGufModel) -> nn::LLaMA<String> {
     insert_sin_cos(gguf);
 
     let nvoc = meta![gguf => tokenizer_ggml_tokens].len();
@@ -85,7 +85,32 @@ pub fn init<'a>(gguf: &'a mut GGufModel) -> nn::LLaMA<String> {
                 },
             })
             .collect(),
+        out_norm: ::nn::Normalization {
+            d: d.into(),
+            epsilon: epsilon as _,
+            items: ::nn::NormType::RmsNorm {
+                dt: dt_norm,
+                scale: "output_norm.weight".into(),
+            },
+        },
+        lm_head: ::nn::Linear {
+            dt: dt_linear,
+            shape: [nvoc.into(), d.into()],
+            weight: "output.weight".into(),
+            bias: None,
+        },
     }
+}
+
+pub fn kv_cache<const N: usize>(gguf: &GGufModel) -> Tensor<usize, N> {
+    let dt = gguf.tensors["token_embd.weight"].dt();
+    let nblk = meta![gguf => llm_block_count];
+    let nctx = meta![gguf => llm_context_length];
+    let d = meta![gguf => llm_embedding_length];
+    let nh = meta![gguf => llm_attention_head_count];
+    let nkvh = meta![gguf => llm_attention_head_count_kv; nh];
+    let dh = meta![gguf => llm_rope_dimension_count; d / nh];
+    Tensor::from_dim_slice(dt, &[nctx, nblk, 2, nkvh, dh])
 }
 
 /// 构造 sin cos 表张量，存储到 GGufModel 中

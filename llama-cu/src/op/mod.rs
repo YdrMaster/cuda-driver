@@ -7,7 +7,7 @@ mod swiglu;
 use cublas::Cublas;
 use cuda::{CurrentCtx, Module, Ptx, Stream, VirByte};
 use nn::Tensor;
-use std::{collections::HashMap, usize};
+use std::collections::HashMap;
 use tensor::digit_layout::{DigitLayout, types};
 
 pub use embedding::Embedding;
@@ -17,7 +17,7 @@ pub use rope::Rope;
 pub use swiglu::Swiglu;
 
 pub trait Operator {
-    fn launch<'a, const N: usize>(
+    fn launch<const N: usize>(
         handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,
@@ -81,32 +81,4 @@ fn move_type(unit: usize) -> &'static str {
 #[inline(always)]
 fn offset_ptr<T, const N: usize>(t: &Tensor<*const T, N>) -> *const T {
     unsafe { t.get().byte_offset(t.layout().offset()) }
-}
-
-mod macros {
-    macro_rules! destruct {
-        ([$( $name:ident ),+] = $iter:expr) => {
-            let mut iter = $iter.into_iter();
-            $( let $name = iter.next().unwrap(); )+
-            assert!(iter.next().is_none());
-        };
-    }
-
-    macro_rules! dims {
-        ($pat:pat = $tensor:expr) => {
-            let &$pat = &*$tensor.shape() else {
-                panic!("Ndim mismatch ( = {})", $tensor.shape().len())
-            };
-        };
-    }
-
-    macro_rules! strides {
-        ($pat:pat = $tensor:expr) => {
-            let &$pat = &*$tensor.strides() else {
-                panic!("Ndim mismatch ( = {})", $tensor.strides().len())
-            };
-        };
-    }
-
-    pub(crate) use {destruct, dims, strides};
 }

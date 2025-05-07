@@ -1,4 +1,5 @@
-﻿use super::{Handle, Operator, macros::destruct, offset_ptr};
+﻿use super::{Handle, Operator, offset_ptr};
+use crate::macros::*;
 use cublas::GemmScheme;
 use cuda::{Stream, VirByte};
 use ggus::ggml_quants::f16;
@@ -64,7 +65,7 @@ impl Operator for Linear {
             &(dt, w.layout().transpose(&[1, 0]).clone()),
         );
 
-        handle.cublas.set_stream(&stream);
+        handle.cublas.set_stream(stream);
         let scalar = match dt {
             types::F16 => GemmScheme::<f16, f32>::new(1., beta).to_value(),
             types::F32 => GemmScheme::<f32, f32>::new(1., beta).to_value(),

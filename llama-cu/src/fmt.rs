@@ -11,7 +11,7 @@ pub fn fmt<const N: usize>(tensor: &Tensor<*const VirByte, N>, _ctx: &CurrentCtx
     let len = *mem_range.end() as usize + tensor.dt().nbytes();
     let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
     let mut host = Blob::new(len);
-    memcpy_d2h(&mut host, &slice);
+    memcpy_d2h(&mut host, slice);
     println!("{}", Fmt(tensor.as_ref().map(|_| host).as_deref()))
 }
 

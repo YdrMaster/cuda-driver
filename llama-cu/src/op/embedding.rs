@@ -1,4 +1,5 @@
-﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, move_type, offset_ptr};
+﻿use super::{Handle, ModuleKey, Operator, cuda_type, move_type, offset_ptr};
+use crate::macros::*;
 use cuda::{Stream, VirByte, params};
 use std::ffi::c_uint;
 use tensor::{Tensor, digit_layout::DigitLayout};
