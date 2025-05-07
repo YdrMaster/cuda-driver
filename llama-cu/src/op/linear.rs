@@ -1,4 +1,5 @@
-﻿use super::{Handle, Operator, macros::destruct, offset_ptr};
+﻿use super::{Handle, Operator, offset_ptr};
+use crate::macros::*;
 use cublas::GemmScheme;
 use cuda::{Stream, VirByte};
 use ggus::ggml_quants::f16;

@@ -1,4 +1,5 @@
-﻿use super::{Handle, ModuleKey, Operator, cuda_type, macros::*, offset_ptr};
+﻿use super::{Handle, ModuleKey, Operator, cuda_type, offset_ptr};
+use crate::macros::*;
 use cuda::{Device, Stream, VirByte, params};
 use nn::Arg;
 use std::ffi::{c_int, c_uint};
