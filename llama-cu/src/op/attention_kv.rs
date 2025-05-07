@@ -1,3 +1,8 @@
+use super::offset_ptr;
+use core::ffi::c_void;
+use cuda::{AsRaw, Stream, VirByte, bindings::CUresult::CUDA_SUCCESS};
+use nn::Tensor;
+
 pub mod bindings {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -5,11 +10,6 @@ pub mod bindings {
     #![allow(unused)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
-
-use super::offset_ptr;
-use core::ffi::c_void;
-use cuda::{AsRaw, Stream, VirByte, bindings::CUresult::CUDA_SUCCESS};
-use nn::Tensor;
 
 /// SAFETY: NineToothedTensor 的生命周期与 tensor 相同
 fn to_nine_toothed_tensor<const N: usize>(
@@ -22,7 +22,7 @@ fn to_nine_toothed_tensor<const N: usize>(
     }
 }
 
-fn launch_attention_kv<const N: usize>(
+pub fn launch_attention_kv<const N: usize>(
     q: Tensor<*const VirByte, N>,
     k: Tensor<*const VirByte, N>,
     v: Tensor<*const VirByte, N>,

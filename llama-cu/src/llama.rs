@@ -3,7 +3,7 @@ use ggus::GGufMetaMapExt;
 use nn::Tensor;
 use tensor::digit_layout::types;
 
-pub fn init<'a>(gguf: &'a mut GGufModel) -> nn::LLaMA<String> {
+pub fn init(gguf: &mut GGufModel) -> nn::LLaMA<String> {
     insert_sin_cos(gguf);
 
     let nvoc = meta![gguf => tokenizer_ggml_tokens].len();

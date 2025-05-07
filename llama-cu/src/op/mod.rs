@@ -8,7 +8,7 @@ mod swiglu;
 use cublas::Cublas;
 use cuda::{CurrentCtx, Module, Ptx, Stream, VirByte};
 use nn::Tensor;
-use std::{collections::HashMap, usize};
+use std::collections::HashMap;
 use tensor::digit_layout::{DigitLayout, types};
 
 pub use embedding::Embedding;
@@ -18,7 +18,7 @@ pub use rope::Rope;
 pub use swiglu::Swiglu;
 
 pub trait Operator {
-    fn launch<'a, const N: usize>(
+    fn launch<const N: usize>(
         handle: &mut Handle,
         arg: Option<nn::Arg>,
         inputs: impl IntoIterator<Item = Tensor<*const VirByte, N>>,

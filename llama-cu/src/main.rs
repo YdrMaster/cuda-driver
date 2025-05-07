@@ -211,9 +211,9 @@ fn main() {
                 Exec::Graph(graph) => graph.launch(&stream),
                 Exec::Attention { q, k, v, .. } => {
                     println!("{i} attention");
-                    fmt::fmt(&q, ctx);
-                    fmt::fmt(&k, ctx);
-                    fmt::fmt(&v, ctx);
+                    fmt::fmt(q, ctx);
+                    fmt::fmt(k, ctx);
+                    fmt::fmt(v, ctx);
                     break;
                 }
             }

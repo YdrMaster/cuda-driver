@@ -13,10 +13,10 @@ pub(crate) enum Exec<'ctx> {
     },
 }
 
-pub fn merge_cuda_graph<'ctx>(
-    ctx: &'ctx CurrentCtx,
+pub fn merge_cuda_graph(
+    ctx: &CurrentCtx,
     exec: impl IntoIterator<Item = nn::Exec<*const VirByte>>,
-) -> (Handle<'ctx>, Box<[Exec<'ctx>]>) {
+) -> (Handle, Box<[Exec]>) {
     let mut handle = op::Handle::new(ctx);
     let mut stream = None;
     let mut exec_ = Vec::new();
