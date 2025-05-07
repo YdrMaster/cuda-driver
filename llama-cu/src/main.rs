@@ -19,7 +19,7 @@ use nn::{
     op::{self as nn_op},
 };
 use range_collector::RangeCollector;
-use std::time::Instant;
+use std::{iter::zip, time::Instant};
 use tensor::digit_layout::DigitLayout;
 
 // cargo run --release -- ../TinyStory-5M-v0.0-F32.gguf
@@ -46,6 +46,7 @@ fn main() {
             [
                 TensorMeta::new(types::U32, [Dim::var("n")]),
                 TensorMeta::new(types::U32, [Dim::var("n")]),
+                TensorMeta::new(types::U32, [1.into()]),
             ],
         )
         .unwrap();
@@ -145,43 +146,38 @@ fn main() {
         .map(|vir| vir.map_on(&dev))
         .collect::<Box<_>>();
 
-    let tokens = [9038u32, 2501, 263, 931, 29892];
-    let pos = [0u32, 1, 2, 3, 4];
+    let tokens = Blob::from_slice(&[9038u32, 2501, 263, 931, 29892]);
+    let pos = Blob::from_slice(&(0..5u32).collect::<Vec<_>>());
+    let out_idx = Blob::from_slice(&[4u32]);
+    let input_data = [tokens, pos, out_idx];
     let attn_pos = 0;
-    let attn_seq = tokens.len();
+    let attn_seq = 5;
     let mask =
         Tensor::<usize, 2>::from_dim_slice(types::F16, &[1, 1, attn_seq, attn_pos + attn_seq])
             .map(|_| build_mask(types::F16, attn_pos, attn_seq));
+
     dev.context().apply(|ctx| {
         let (_handle, exec) = merge_cuda_graph(ctx, exec);
         times.push("build cuda graph");
         println!("{times}");
 
-        memcpy_h2d(
-            unsafe {
-                std::slice::from_raw_parts_mut(
-                    global_inputs[0].get().cast_mut().cast(),
-                    size_of_val(&tokens),
-                )
-            },
-            &tokens,
-        );
-        memcpy_h2d(
-            unsafe {
-                std::slice::from_raw_parts_mut(
-                    global_inputs[1].get().cast_mut().cast(),
-                    size_of_val(&pos),
-                )
-            },
-            &pos,
-        );
+        for (input, data) in zip(&global_inputs, input_data.clone()) {
+            let ptr = input.get().cast_mut();
+            memcpy_h2d(
+                unsafe { std::slice::from_raw_parts_mut(ptr.cast(), data.len()) },
+                &data,
+            )
+        }
+
         let stream = ctx.stream();
         let mask = mask.as_ref().map(|blob| stream.from_host(blob));
         let mask = mask.as_ref().map(|blob| blob.as_ptr().cast::<VirByte>());
 
         for exec in &exec {
             match exec {
-                Exec::Graph(graph) => graph.launch(&stream),
+                Exec::Graph(graph) => {
+                    graph.launch(&stream);
+                }
                 Exec::Attention(exec::Attention { iblk, q, k, v, o }) => {
                     let q = q
                         .clone()
@@ -211,26 +207,27 @@ fn main() {
                     let k_cache_end = kv_cahce_end.clone().transform(|layout| layout.index(2, 0));
                     let v_cache_end = kv_cahce_end.clone().transform(|layout| layout.index(2, 1));
 
-                    fmt::fmt(&q, ctx);
-                    fmt::fmt(&k, ctx);
-                    fmt::fmt(&v, ctx);
+                    // fmt::fmt(&q, ctx);
+                    // fmt::fmt(&k, ctx);
+                    // fmt::fmt(&v, ctx);
                     op::launch_attention_kv(
                         q,
                         k,
                         v,
                         k_cache,
-                        k_cache_end.clone(),
+                        k_cache_end,
                         v_cache,
-                        v_cache_end.clone(),
-                        mask,
-                        o.clone(),
+                        v_cache_end,
+                        mask.clone(),
+                        o,
                         &stream,
                     );
-                    println!("-------------------------");
-                    fmt::fmt(&k_cache_end, ctx);
-                    fmt::fmt(&v_cache_end, ctx);
-                    fmt::fmt(&o, ctx);
-                    break;
+                    stream.synchronize();
+                    // println!("-------------------------");
+                    // fmt::fmt(&k_cache_end, ctx);
+                    // fmt::fmt(&v_cache_end, ctx);
+                    // fmt::fmt(&o, ctx);
+                    // break;
                 }
             }
         }
