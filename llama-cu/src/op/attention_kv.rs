@@ -1,5 +1,4 @@
 use super::offset_ptr;
-use core::ffi::c_void;
 use cuda::{AsRaw, Stream, VirByte, bindings::CUresult::CUDA_SUCCESS};
 use nn::Tensor;
 
@@ -29,9 +28,9 @@ pub fn launch_attention_kv<const N: usize>(
     let v_cache_end = NTTBuf::from(v_cache_end);
     let mask = NTTBuf::from(mask);
     let o = NTTBuf::from(o);
-    unsafe {
-        let result = bindings::launch_attention_kv(
-            stream.as_raw() as *mut c_void,
+    let result = unsafe {
+        bindings::launch_attention_kv_nh_64(
+            stream.as_raw().cast(),
             q.to_ntt(),
             k.to_ntt(),
             v.to_ntt(),
@@ -41,10 +40,10 @@ pub fn launch_attention_kv<const N: usize>(
             v_cache_end.to_ntt(),
             mask.to_ntt(),
             o.to_ntt(),
-        );
-        if result != CUDA_SUCCESS as i32 {
-            panic!("launch_attention_kv failed: {}", result);
-        }
+        )
+    };
+    if result != CUDA_SUCCESS as i32 {
+        panic!("launch_attention_kv failed: {}", result);
     }
 }
 

@@ -20,8 +20,8 @@ fn main() {
     let cuda_src_dir_path = current_dir.join(cuda_src_dir);
 
     // CUDA源文件路径
-    let cuda_src_path = cuda_src_dir_path.join("attention_kv.c");
-    let header_path = cuda_src_dir_path.join("attention_kv.h");
+    let cuda_src_path = cuda_src_dir_path.join("attention_kv_nh_64.c");
+    let header_path = cuda_src_dir_path.join("attention_kv_nh_64.h");
 
     // 输出库文件路径 - 更改为明确的库名称
     let lib_name = "attention_kv";
@@ -57,7 +57,7 @@ fn main() {
         // 告诉bindgen在哪里可以找到CUDA头文件
         .clang_arg(format!("-I{}", cuda_root.join("include").to_str().unwrap()))
         // 只生成attention_kv.h中的特定函数
-        .allowlist_function("launch_attention_kv")
+        .allowlist_function("launch_attention_kv.*")
         // 生成Rust风格的枚举
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,

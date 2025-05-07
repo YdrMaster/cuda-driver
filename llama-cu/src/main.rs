@@ -101,12 +101,19 @@ fn main() {
     let (weight_vir, weight_phy) = mapped.unmap();
     times.push("cuda");
 
-    let graph = nn::Graph(graph::Graph { topo, nodes, edges }).lower(&[("n", 5)].into(), |t| t);
+    let tokens = [
+        9038u32, 2501, 263, 931, 29892, 727, 471, 263, 4123, 7826, 4257, 365, 2354, 29889, 365,
+        2354, 471, 263, 2924, 322, 9914, 10752, 29892, 2337, 3063, 363, 5837, 304, 1371, 4045,
+        29889, 2296, 18012, 304, 1303, 29892, 322, 902, 25448, 3143, 471, 1048, 263, 26565, 889,
+        523, 1058, 7160, 263, 12456, 985, 515, 263, 8338, 265,
+    ];
+    let n_tok = tokens.len();
+    let graph = nn::Graph(graph::Graph { topo, nodes, edges }).lower(&[("n", n_tok)].into(), |t| t);
     times.push("fix shape");
 
     let mem_range_map = graph.mem_range_map(8 << 30, 512);
 
-    let workspace_vir = reserve_pages(mem_range_map.range.len(), page_size);
+    let workspace_vir = reserve_page(mem_range_map.range.len(), page_size);
     let ptr = workspace_vir[0].as_ptr();
     let graph = graph.lower(
         |key| unsafe { ptr.byte_add(mem_range_map.map[&key].start) },
@@ -146,12 +153,12 @@ fn main() {
         .map(|vir| vir.map_on(&dev))
         .collect::<Box<_>>();
 
-    let tokens = Blob::from_slice(&[9038u32, 2501, 263, 931, 29892]);
-    let pos = Blob::from_slice(&(0..5u32).collect::<Vec<_>>());
-    let out_idx = Blob::from_slice(&[4u32]);
+    let tokens = Blob::from_slice(&tokens);
+    let pos = Blob::from_slice(&(0..n_tok as u32).collect::<Vec<_>>());
+    let out_idx = Blob::from_slice(&[n_tok as u32 - 1]);
     let input_data = [tokens, pos, out_idx];
     let attn_pos = 0;
-    let attn_seq = 5;
+    let attn_seq = n_tok;
     let mask =
         Tensor::<usize, 2>::from_dim_slice(types::F16, &[1, 1, attn_seq, attn_pos + attn_seq])
             .map(|_| build_mask(types::F16, attn_pos, attn_seq));
@@ -193,13 +200,10 @@ fn main() {
                         .transform(|layout| layout.tile_be(0, &[1, layout.shape()[0]]));
 
                     // [1, nkvh, 2, nctx, dh]
-                    let blk_cache = kv_cache.clone().transform(|layout| {
+                    let kv_cache = kv_cache.clone().transform(|layout| {
                         layout.index(1, *iblk).tile_be(0, &[1, layout.shape()[0]])
                     });
-                    let kv_cache = blk_cache
-                        .clone()
-                        .transform(|layout| layout.slice(3, 0, 1, attn_pos));
-                    let kv_cahce_end = blk_cache
+                    let kv_cahce_end = kv_cache
                         .clone()
                         .transform(|layout| layout.slice(3, attn_pos, 1, attn_seq));
                     let k_cache = kv_cache.clone().transform(|layout| layout.index(2, 0));
@@ -207,27 +211,22 @@ fn main() {
                     let k_cache_end = kv_cahce_end.clone().transform(|layout| layout.index(2, 0));
                     let v_cache_end = kv_cahce_end.clone().transform(|layout| layout.index(2, 1));
 
-                    // fmt::fmt(&q, ctx);
-                    // fmt::fmt(&k, ctx);
-                    // fmt::fmt(&v, ctx);
                     op::launch_attention_kv(
                         q,
                         k,
                         v,
                         k_cache,
-                        k_cache_end,
+                        k_cache_end.clone(),
                         v_cache,
-                        v_cache_end,
+                        v_cache_end.clone(),
                         mask.clone(),
-                        o,
+                        o.clone(),
                         &stream,
                     );
                     stream.synchronize();
-                    // println!("-------------------------");
-                    // fmt::fmt(&k_cache_end, ctx);
-                    // fmt::fmt(&v_cache_end, ctx);
-                    // fmt::fmt(&o, ctx);
-                    // break;
+                    println!("-------------------------");
+                    fmt::fmt(&o, ctx);
+                    break;
                 }
             }
         }
