@@ -84,7 +84,7 @@ fn test_compute() {
         driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
-        ctx.instantiate(&graph).launch(&stream);
+        stream.launch_graph(&ctx.instantiate(&graph));
         // 测试计算正确
         check(&stream, &c);
         // ----------------------------------------------------
@@ -103,7 +103,7 @@ fn test_compute() {
         driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
-        ctx.instantiate(&graph).launch(&stream);
+        stream.launch_graph(&ctx.instantiate(&graph));
         // 测试计算正确
         check(&stream, &c);
     })
@@ -200,7 +200,7 @@ fn test_compute_batched() {
         driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
-        ctx.instantiate(&graph).launch(&stream);
+        stream.launch_graph(&ctx.instantiate(&graph));
         // 测试计算正确
         check(&stream, &c);
         // ----------------------------------------------------
@@ -219,7 +219,7 @@ fn test_compute_batched() {
         driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
-        ctx.instantiate(&graph).launch(&stream);
+        stream.launch_graph(&ctx.instantiate(&graph));
         // 测试计算正确
         check(&stream, &c);
     })

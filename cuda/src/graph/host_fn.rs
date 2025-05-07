@@ -178,7 +178,7 @@ mod test {
                 &[],
             );
             //两者不排序不保证执行顺序
-            exec.launch(&stream);
+            stream.launch_graph(&exec);
         });
     }
 
@@ -200,7 +200,7 @@ mod test {
             let exec = ctx.instantiate(&graph);
 
             //两者不排序不保证执行顺序
-            exec.launch(&stream);
+            stream.launch_graph(&exec);
         });
     }
 }

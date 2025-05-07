@@ -191,7 +191,7 @@ mod test {
         dev.context().apply(|ctx| {
             memcpy_h2d(src, &origin);
 
-            ctx.instantiate(graph).launch(&ctx.stream());
+            ctx.stream().launch_graph(&ctx.instantiate(graph));
 
             let mut host = vec![0u64; origin.len()];
             memcpy_d2h(&mut host, dst);

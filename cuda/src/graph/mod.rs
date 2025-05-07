@@ -28,6 +28,11 @@ impl<'ctx> Stream<'ctx> {
         driver!(cuStreamBeginCapture_v2(self.as_raw(), LOCAL));
         CaptureStream(self)
     }
+
+    pub fn launch_graph(&self, graph: &GraphExec) -> &Self {
+        driver!(cuGraphLaunch(graph.0.rss, self.as_raw()));
+        self
+    }
 }
 
 impl CaptureStream<'_> {
@@ -113,13 +118,6 @@ impl AsRaw for GraphExec<'_> {
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.rss
-    }
-}
-
-impl GraphExec<'_> {
-    #[inline]
-    pub fn launch(&self, stream: &Stream) {
-        driver!(cuGraphLaunch(self.0.rss, stream.as_raw()))
     }
 }
 
@@ -362,16 +360,18 @@ extern "C" __global__ void mul(float *a, float const *b) {
             // 执行图可以多次执行
 
             let exec = ctx.instantiate(&graph);
-            exec.launch(&stream);
-            exec.launch(&stream);
-            exec.launch(&stream);
+            stream
+                .launch_graph(&exec)
+                .launch_graph(&exec)
+                .launch_graph(&exec);
 
             // 释放掉图之后执行图仍能执行
 
             let _ = graph;
-            exec.launch(&stream);
-            exec.launch(&stream);
-            exec.launch(&stream);
+            stream
+                .launch_graph(&exec)
+                .launch_graph(&exec)
+                .launch_graph(&exec);
 
             let stream = stream.capture();
 
