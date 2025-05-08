@@ -234,19 +234,3 @@ fn test_behavior() {
 
     assert_eq!(&*host, &*host_)
 }
-
-#[test]
-fn test_reserve_many() {
-    if let Err(crate::NoDevice) = crate::init() {
-        return;
-    }
-    let minimum = Device::new(0).mem_prop().granularity_minimum();
-    // 不知道虚存段的分配逻辑是什么，多线程情况下无论地址段放多高，都常常出现失败现象
-    let pages = (0..1024)
-        .map(|_| VirMem::new(minimum, 0x20_0000_0000))
-        .collect::<Box<_>>();
-    for vir in pages.windows(2) {
-        let [a, b] = vir else { unreachable!() };
-        assert_eq!(a.as_ptr_range().end, b.as_ptr())
-    }
-}

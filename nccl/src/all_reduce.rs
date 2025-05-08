@@ -62,7 +62,7 @@ fn test() {
                 // let mut mem = stream.malloc::<f32>(N); // stream ordered memory allocation is not allowed in NCCL
 
                 stream.memcpy_h2d(&mut mem, &array);
-                comm.all_reduce(&mut mem, None, F32, ReduceType::ncclSum, &stream);
+                comm.all_reduce(&mut mem, None, F32, ReduceType::ncclSum, stream);
                 mem.sporulate()
             })
         })
@@ -71,9 +71,9 @@ fn test() {
     for (context, (stream, mem)) in zip(contexts, zip(streams, mem)) {
         context.apply(|ctx| {
             ctx.synchronize();
-            cuda::memcpy_d2h(&mut array, &*mem.sprout(ctx));
+            cuda::memcpy_d2h(&mut array, &mem.sprout(ctx));
             assert_eq!(array, [2.; N]);
             stream.sprout(ctx);
-        });
+        })
     }
 }

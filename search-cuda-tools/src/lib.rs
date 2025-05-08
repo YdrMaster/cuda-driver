@@ -28,3 +28,21 @@ pub fn find_nccl_root() -> Option<Option<PathBuf>> {
             .map(|path| Some(path.into()))
     }
 }
+
+#[test]
+fn test_find() {
+    let Some(root) = find_cuda_root() else {
+        println!("cuda not exist");
+        return;
+    };
+    println!("cuda root = {}", root.display());
+    let Some(nccl) = find_nccl_root() else {
+        println!("nccl not exist");
+        return;
+    };
+    let Some(nccl) = nccl else {
+        println!("find nccl in ldconfig path");
+        return;
+    };
+    println!("nccl root = {nccl:?}")
+}
