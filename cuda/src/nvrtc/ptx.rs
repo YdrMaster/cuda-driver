@@ -111,8 +111,12 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
     {
         use std::sync::LazyLock;
         static VERSION: LazyLock<Version> = LazyLock::new(crate::version);
+        const TARGET: Version = Version {
+            major: 12,
+            minor: 6,
+        };
 
-        if VERSION.major < 12 {
+        if *VERSION < TARGET {
             let cccl = std::option_env!("CCCL_ROOT").map_or_else(clone_cccl, PathBuf::from);
             if cccl.is_dir() {
                 const DIRS: &[&str] = &[
