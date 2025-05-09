@@ -53,7 +53,7 @@ impl AsRaw for Communicator {
 impl Drop for Communicator {
     #[inline]
     fn drop(&mut self) {
-        nccl!(ncclCommDestroy(self.0));
+        nccl!(ncclCommDestroy(self.0))
     }
 }
 

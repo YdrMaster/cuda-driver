@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `Graph`, `GraphSpore` and `CaptureStream`;
 - Add `MappedMem`, `MemProp`, `PhyMem`, `VirByte` and `VirMem` to use Device Virtual Memory;
 - Add `memcpy_d2h` to `Stream` for page-locked memory;
+- Add `index` to `Device` for device index;
 
 ### Changed
 

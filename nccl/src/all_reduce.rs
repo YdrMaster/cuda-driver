@@ -18,6 +18,7 @@ impl Communicator {
                 assert_eq!(src.len(), size);
                 src.as_ptr() as _
             } else {
+                // 如果 src 不存在，原地执行
                 recvbuff
             },
             recvbuff,
@@ -30,50 +31,96 @@ impl Communicator {
     }
 }
 
-#[test]
-fn test() {
+#[cfg(test)]
+mod test {
+    use super::ReduceType;
     use crate::CommunicatorGroup;
     use cuda::{ContextResource, ContextSpore};
-    use digit_layout::types::F32;
+    use digit_layout::types::{self, F32};
     use std::iter::zip;
 
-    const N: usize = 12 << 10; // 10K * sizeof::<f32>() = 40K bytes
+    const N: usize = 2 << 20;
 
-    let group = match cuda::init() {
-        Ok(()) if cuda::Device::count() >= 2 => CommunicatorGroup::new(&[0, 1]),
-        _ => return,
-    };
+    #[test]
+    fn test() {
+        let group = match cuda::init() {
+            Ok(()) if cuda::Device::count() >= 2 => CommunicatorGroup::new(&[0, 1]),
+            _ => return,
+        };
 
-    let mut array = [1.0f32; N];
-    let contexts = group.contexts().collect::<Vec<_>>();
-    let streams = contexts
-        .iter()
-        .map(|context| context.apply(|ctx| ctx.stream().sporulate()))
-        .collect::<Vec<_>>();
-    let mem = group
-        .call()
-        .iter()
-        .enumerate()
-        .map(|(i, comm)| {
-            contexts[i].apply(|ctx| {
-                let stream = streams[i].sprout_ref(ctx);
-
-                let mut mem = ctx.malloc::<f32>(N);
-                // let mut mem = stream.malloc::<f32>(N); // stream ordered memory allocation is not allowed in NCCL
-
-                stream.memcpy_h2d(&mut mem, &array);
-                comm.all_reduce(&mut mem, None, F32, ReduceType::ncclSum, stream);
-                mem.sporulate()
+        let mut array = vec![1.0f32; N];
+        let contexts = group.contexts().collect::<Vec<_>>();
+        let streams = contexts
+            .iter()
+            .map(|context| context.apply(|ctx| ctx.stream().sporulate()))
+            .collect::<Vec<_>>();
+        let mem = group
+            .call()
+            .iter()
+            .enumerate()
+            .map(|(i, comm)| {
+                contexts[i].apply(|ctx| {
+                    let stream = streams[i].sprout_ref(ctx);
+                    let mut mem = stream.malloc::<f32>(N);
+                    stream.memcpy_h2d(&mut mem, &array);
+                    comm.all_reduce(&mut mem, None, F32, ReduceType::ncclSum, stream);
+                    mem.sporulate()
+                })
             })
-        })
-        .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
-    for (context, (stream, mem)) in zip(contexts, zip(streams, mem)) {
-        context.apply(|ctx| {
-            ctx.synchronize();
-            cuda::memcpy_d2h(&mut array, &mem.sprout(ctx));
-            assert_eq!(array, [2.; N]);
-            stream.sprout(ctx);
-        })
+        for (context, (stream, mem)) in zip(contexts, zip(streams, mem)) {
+            context.apply(|ctx| {
+                ctx.synchronize();
+                cuda::memcpy_d2h(&mut array, &mem.sprout(ctx));
+                assert_eq!(array, [2.; N]);
+                stream.sprout(ctx);
+            })
+        }
+    }
+
+    #[test]
+    fn test_capture() {
+        let group = match cuda::init() {
+            Ok(()) if cuda::Device::count() >= 2 => CommunicatorGroup::new(&[0, 1]),
+            _ => return,
+        };
+
+        let array = vec![1.0f32; N];
+        std::thread::scope(|s| {
+            group
+                .into_vec()
+                .into_iter()
+                .map(|comm| {
+                    let array = array.clone();
+                    s.spawn(move || {
+                        let device = comm.device();
+                        let graph = device.retain_primary().apply(|ctx| {
+                            let stream = ctx.stream();
+                            let mut mem = stream.from_host(&array);
+                            let stream = stream.capture();
+                            comm.all_reduce(
+                                &mut mem,
+                                None,
+                                types::F32,
+                                ReduceType::ncclSum,
+                                &stream,
+                            );
+                            stream.end()
+                        });
+                        graph.save_dot(
+                            std::env::current_dir()
+                                .unwrap()
+                                .join(format!("comm{}.dot", device.index())),
+                        );
+                        // 捕获了 communicator 操作的 graph 必须先于 communicator 释放
+                        // 如果打开 ↓ 这个释放操作会在此阻塞
+                        // drop(comm)
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .for_each(|t| t.join().unwrap())
+        });
     }
 }

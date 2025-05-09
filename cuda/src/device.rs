@@ -45,6 +45,11 @@ impl Device {
     }
 
     #[inline]
+    pub const fn index(&self) -> c_int {
+        self.0
+    }
+
+    #[inline]
     pub fn compute_capability(&self) -> Version {
         Version {
             major: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR),
