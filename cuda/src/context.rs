@@ -235,7 +235,7 @@ fn test_mem_info() {
         println!("mem info: {free}/{total}");
         // 从池中分配空间
         let stream = ctx.stream();
-        let mem = stream.malloc::<u8>((free.0 >> 30).saturating_sub(1) << 30);
+        let mem = stream.malloc::<u8>(free.0 * 3 / 4);
         let (free, total) = ctx.mem_info();
         println!("mem info: {free}/{total}");
         // 释放的存储只会回到池中，驱动不可见

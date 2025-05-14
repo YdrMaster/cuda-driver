@@ -8,7 +8,7 @@
 };
 use context_spore::AsRaw;
 use std::{
-    mem::ManuallyDrop,
+    collections::BTreeMap,
     ops::{Deref, DerefMut},
     ptr::null_mut,
     slice::{from_raw_parts, from_raw_parts_mut},
@@ -58,20 +58,19 @@ pub struct VirByte(u8);
 pub struct VirMem {
     ptr: CUdeviceptr,
     len: usize,
+    /// offset -> phy
+    map: BTreeMap<usize, PhyRegion>,
 }
 
 impl VirMem {
     pub fn new(len: usize, min_addr: usize) -> Self {
         let mut ptr = 0;
         driver!(cuMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
-        Self { ptr, len }
-    }
-}
-
-impl Drop for VirMem {
-    fn drop(&mut self) {
-        let &mut Self { ptr, len } = self;
-        driver!(cuMemAddressFree(ptr, len))
+        Self {
+            ptr,
+            len,
+            map: [(0, len.into())].into(),
+        }
     }
 }
 
@@ -86,6 +85,19 @@ impl Deref for VirMem {
 impl DerefMut for VirMem {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { from_raw_parts_mut(self.ptr as _, self.len) }
+    }
+}
+
+impl Drop for VirMem {
+    fn drop(&mut self) {
+        let Self { ptr, len, map } = self;
+        let map = std::mem::take(map);
+        for (offset, region) in map {
+            if let PhyRegion::Mapped(phy) = region {
+                driver!(cuMemUnmap(*ptr + offset as CUdeviceptr, phy.len))
+            }
+        }
+        driver!(cuMemAddressFree(*ptr, *len))
     }
 }
 
@@ -134,68 +146,76 @@ impl PhyMem {
     }
 }
 
-#[repr(transparent)]
-pub struct MappedMem(ManuallyDrop<Internal>);
+enum PhyRegion {
+    Mapped(Arc<PhyMem>),
+    Vacant(usize),
+}
 
-/// 需要一个内部结构来控制何时自动释放。
-///
-/// [`MappedMem`] 自动释放时，[`Internal`] 的两个成员递归释放。主动解映射时，[`Internal`] 的成员被取出，不释放。
-struct Internal {
-    vir: VirMem,
-    phy: Arc<PhyMem>,
+impl From<Arc<PhyMem>> for PhyRegion {
+    fn from(value: Arc<PhyMem>) -> Self {
+        Self::Mapped(value)
+    }
+}
+
+impl From<usize> for PhyRegion {
+    fn from(value: usize) -> Self {
+        Self::Vacant(value)
+    }
 }
 
 impl VirMem {
-    pub fn map(self, phy: Arc<PhyMem>) -> MappedMem {
-        debug_assert!(
-            self.len >= phy.len,
-            "cannot map physical memory to a smaller address region"
-        );
-        driver!(cuMemMap(self.ptr, phy.len, 0, phy.handle, 0));
-
-        let desc = CUmemAccessDesc {
-            location: phy.location,
-            flags: CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE,
+    pub fn map(&mut self, offset: usize, phy: Arc<PhyMem>) -> &mut [DevByte] {
+        // 检查范围
+        assert!(offset <= self.len && offset + phy.len <= self.len);
+        // 查找所在区间
+        let (head, region) = self.map.range(..=offset).next_back().unwrap();
+        // 获取空闲段长度
+        let len = match *region {
+            PhyRegion::Mapped(_) => panic!("mem is mapped"),
+            PhyRegion::Vacant(len) => len,
         };
-        driver!(cuMemSetAccess(self.ptr, phy.len, &desc, 1));
-
-        MappedMem(ManuallyDrop::new(Internal { vir: self, phy }))
+        assert!(phy.len <= len);
+        // 映射
+        {
+            let ptr = self.ptr + offset as CUdeviceptr;
+            driver!(cuMemMap(ptr, phy.len, 0, phy.handle, 0));
+            let desc = CUmemAccessDesc {
+                location: phy.location,
+                flags: CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE,
+            };
+            driver!(cuMemSetAccess(ptr, phy.len, &desc, 1));
+        }
+        // 移除空闲段
+        let head = *head;
+        self.map.remove(&head);
+        // 插入映射段
+        let phy_len = phy.len;
+        self.map.insert(offset, phy.into());
+        // 插入头尾空闲段
+        let head_len = offset - head;
+        let tail_len = len - head_len - phy_len;
+        if head_len > 0 {
+            self.map.insert(head, head_len.into());
+        }
+        if tail_len > 0 {
+            let tail = head + head_len + phy_len;
+            self.map.insert(tail, tail_len.into());
+        }
+        unsafe { std::slice::from_raw_parts_mut((self.ptr + offset as CUdeviceptr) as _, phy_len) }
     }
 
-    pub fn map_on(self, dev: &Device) -> MappedMem {
-        let len = self.len;
-        self.map(dev.mem_prop().create(len))
-    }
-}
-
-impl Drop for MappedMem {
-    fn drop(&mut self) {
-        driver!(cuMemUnmap(self.0.vir.ptr, self.0.phy.len));
-        unsafe { ManuallyDrop::drop(&mut self.0) }
-    }
-}
-
-impl MappedMem {
-    pub fn unmap(mut self) -> (VirMem, Arc<PhyMem>) {
-        driver!(cuMemUnmap(self.0.vir.ptr, self.0.phy.len));
-        let Internal { vir, phy } = unsafe { ManuallyDrop::take(&mut self.0) };
-        std::mem::forget(self);
-        (vir, phy)
-    }
-}
-
-impl Deref for MappedMem {
-    type Target = [DevByte];
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        unsafe { from_raw_parts(self.0.vir.ptr as _, self.0.phy.len) }
-    }
-}
-
-impl DerefMut for MappedMem {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { from_raw_parts_mut(self.0.vir.ptr as _, self.0.phy.len) }
+    pub fn unmap(&mut self, offset: usize) -> Arc<PhyMem> {
+        let region = self.map.get_mut(&offset).expect("offset is not a boundary");
+        let len = match region {
+            PhyRegion::Mapped(phy_mem) => phy_mem.len,
+            PhyRegion::Vacant(_) => panic!("offset is not mapped"),
+        };
+        let PhyRegion::Mapped(phy) = std::mem::replace(region, len.into()) else {
+            unreachable!()
+        };
+        let ptr = self.ptr + offset as CUdeviceptr;
+        driver!(cuMemUnmap(ptr, phy.len));
+        phy
     }
 }
 
@@ -213,24 +233,24 @@ fn test_behavior() {
     println!("minimun = {minimum}, recommended = {recommended}");
 
     // 分配一个较大的虚地址区域
-    let virmem = VirMem::new(10 * minimum, 0);
+    let mut virmem = VirMem::new(10 * minimum, 0);
     // 分配一个较小的物理页
     let phymem = prop.create(minimum);
     // 建立映射
-    let mut mapped = virmem.map(phymem.clone());
+    let mapped = virmem.map(minimum, phymem.clone());
 
     // 通过虚地址操作存储空间
     let host = (0..minimum / size_of::<usize>()).collect::<Box<_>>();
     // 对存储空间的操作仍然需要在上下文中进行
-    dev.context().apply(|_| memcpy_h2d(&mut mapped, &host));
+    dev.context().apply(|_| memcpy_h2d(mapped, &host));
 
     // 分配另一个虚地址区域
-    let virmem = VirMem::new(2 * minimum, 0);
+    let mut virmem = VirMem::new(2 * minimum, 0);
     // 将同一个物理页映射到虚地址区域
-    let mapped = virmem.map(phymem);
+    let mapped = virmem.map(minimum, phymem);
     // 在另一个上下文中读取存储空间
     let mut host_ = vec![0usize; host.len()];
-    dev.context().apply(|_| memcpy_d2h(&mut host_, &mapped));
+    dev.context().apply(|_| memcpy_d2h(&mut host_, mapped));
 
     assert_eq!(&*host, &*host_)
 }

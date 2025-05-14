@@ -151,29 +151,31 @@ mod test {
         let prop = dev.mem_prop();
         let minium = prop.granularity_minimum();
 
-        let mut dst = VirMem::new(minium, 0).map_on(&dev);
-        let src = VirMem::new(minium, 0).map_on(&dev);
+        let mut dst_vir = VirMem::new(minium, 0);
+        let mut src_vir = VirMem::new(minium, 0);
+        let dst = dst_vir.map(0, prop.create(minium));
+        let src = src_vir.map(0, prop.create(minium));
 
         let graph = Graph::new();
         // 虚存不能直接传入 memcpy node，当时必须是已映射状态
-        graph.add_memcpy_d2d(&mut dst, &src, &[]);
+        graph.add_memcpy_d2d(dst, src, &[]);
 
         let phy0 = prop.create(minium);
         let phy1 = prop.create(minium);
         let phy2 = prop.create(minium);
         let phy3 = prop.create(minium);
 
-        let (vir_dst, _) = dst.unmap();
-        let (vir_src, _) = src.unmap();
-        let mut dst = vir_dst.map(phy0);
-        let mut src = vir_src.map(phy1);
-        test_memcpy_in_graph(&dev, &graph, &mut dst, &mut src, 0..);
+        let _ = dst_vir.unmap(0);
+        let _ = src_vir.unmap(0);
+        let dst = dst_vir.map(0, phy0);
+        let src = src_vir.map(0, phy1);
+        test_memcpy_in_graph(&dev, &graph, dst, src, 0..);
 
-        let (vir_dst, _phy0) = dst.unmap();
-        let (vir_src, _phy1) = src.unmap();
-        let mut dst = vir_dst.map(phy2);
-        let mut src = vir_src.map(phy3);
-        test_memcpy_in_graph(&dev, &graph, &mut dst, &mut src, (0..u64::MAX).rev());
+        let _phy0 = dst_vir.unmap(0);
+        let _phy1 = src_vir.unmap(0);
+        let dst = dst_vir.map(0, phy2);
+        let src = src_vir.map(0, phy3);
+        test_memcpy_in_graph(&dev, &graph, dst, src, (0..u64::MAX).rev());
     }
 
     fn test_memcpy_in_graph(
