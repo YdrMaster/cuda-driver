@@ -134,6 +134,8 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
             }
         }
     }
+    #[cfg(iluvatar)]
+    let _ = code;
 
     // let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
     //     || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),

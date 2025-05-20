@@ -10,9 +10,9 @@ doctest = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+log = "0.4"
 context-spore = "0.1"
 find_cuda_helper.workspace = true
-log = "0.4"
 search-corex-tools.path = "../search-corex-tools"
 
 [build-dependencies]

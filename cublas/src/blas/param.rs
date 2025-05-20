@@ -1,12 +1,17 @@
-﻿use crate::bindings::{cublasComputeType_t, cudaDataType};
+﻿use crate::bindings::cudaDataType;
 use half::{bf16, f16};
 use std::{ffi::c_void, marker::PhantomData};
+
+#[cfg(nvidia)]
+type CublasComputeType = crate::bindings::cublasComputeType_t;
+#[cfg(iluvatar)]
+type CublasComputeType = crate::bindings::cudaDataType;
 
 pub trait Computation {
     fn a_type(&self) -> cudaDataType;
     fn b_type(&self) -> cudaDataType;
     fn c_type(&self) -> cudaDataType;
-    fn compute_type(&self) -> cublasComputeType_t;
+    fn compute_type(&self) -> CublasComputeType;
     fn alpha(&self) -> &c_void;
     fn beta(&self) -> &c_void;
 }
@@ -79,8 +84,8 @@ macro_rules! impl_computation {
             fn c_type(&self) -> cudaDataType {
                 cudaDataType::$cuda_ty
             }
-            fn compute_type(&self) -> cublasComputeType_t {
-                cublasComputeType_t::$cublas_ty
+            fn compute_type(&self) -> CublasComputeType {
+                CublasComputeType::$cublas_ty
             }
             fn alpha(&self) -> &c_void {
                 unsafe { &*(&raw const self.alpha).cast() }
@@ -92,17 +97,33 @@ macro_rules! impl_computation {
     };
 }
 
+#[cfg(nvidia)]
 impl_computation!( f16 => CUDA_R_16F ; f16 => CUBLAS_COMPUTE_16F);
+#[cfg(nvidia)]
 impl_computation!( f16 => CUDA_R_16F ; f32 => CUBLAS_COMPUTE_32F);
+#[cfg(nvidia)]
 impl_computation!(bf16 => CUDA_R_16BF; f32 => CUBLAS_COMPUTE_32F);
+#[cfg(nvidia)]
 impl_computation!( f32 => CUDA_R_32F ; f32 => CUBLAS_COMPUTE_32F);
+#[cfg(nvidia)]
 impl_computation!( f64 => CUDA_R_64F ; f64 => CUBLAS_COMPUTE_64F);
+
+#[cfg(iluvatar)]
+impl_computation!( f16 => CUDA_R_16F ; f16 => CUDA_R_16F);
+#[cfg(iluvatar)]
+impl_computation!( f16 => CUDA_R_16F ; f32 => CUDA_R_32F);
+#[cfg(iluvatar)]
+impl_computation!(bf16 => CUDA_R_16BF; f32 => CUDA_R_32F);
+#[cfg(iluvatar)]
+impl_computation!( f32 => CUDA_R_32F ; f32 => CUDA_R_32F);
+#[cfg(iluvatar)]
+impl_computation!( f64 => CUDA_R_64F ; f64 => CUDA_R_64F);
 
 pub struct ComputationValue {
     a: cudaDataType,
     b: cudaDataType,
     c: cudaDataType,
-    compute: cublasComputeType_t,
+    compute: CublasComputeType,
     data: [u64; 2],
 }
 
@@ -116,7 +137,7 @@ impl Computation for ComputationValue {
     fn c_type(&self) -> cudaDataType {
         self.c
     }
-    fn compute_type(&self) -> cublasComputeType_t {
+    fn compute_type(&self) -> CublasComputeType {
         self.compute
     }
     fn alpha(&self) -> &c_void {

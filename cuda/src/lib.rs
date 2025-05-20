@@ -35,6 +35,7 @@ mod context;
 mod dev_mem;
 mod device;
 mod event;
+#[cfg(any(nvidia, all(iluvatar, not(test))))]
 mod graph;
 mod host_mem;
 mod nvrtc;
@@ -67,6 +68,7 @@ pub use context_spore::{AsRaw, ContextResource, ContextSpore, RawContainer, impl
 pub use dev_mem::{DevByte, DevMem, DevMemSpore, memcpy_d2d, memcpy_d2h, memcpy_h2d};
 pub use device::{BlockLimit, Device, SMLimit};
 pub use event::{Event, EventSpore};
+#[cfg(any(nvidia, all(iluvatar, not(test))))]
 pub use graph::*;
 pub use host_mem::{HostMem, HostMemSpore};
 pub use nvrtc::{KernelFn, KernelParamPtrs, KernelParams, Module, ModuleSpore, Ptx, Symbol};

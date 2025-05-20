@@ -1,4 +1,6 @@
-﻿use super::{Cublas, GemmScheme};
+﻿#![cfg_attr(iluvatar, allow(unreachable_code, unused))]
+
+use super::{Cublas, GemmScheme};
 use cuda::{DevByte, Device, Graph, GraphNode, Stream, driver};
 
 #[test]
@@ -56,6 +58,8 @@ fn test_compute() {
             )
         }
         check(&stream, &c);
+        #[cfg(iluvatar)] // TODO: Iluvatar
+        return;
         // ----------------------------------------------------
         // 捕获计算图
         let stream = stream.capture();
@@ -147,6 +151,8 @@ fn test_compute_batched() {
 
         let stream = ctx.stream();
         blas.set_stream(&stream);
+        #[cfg(iluvatar)]
+        return;
         unsafe {
             blas.gemm_batched(
                 3,

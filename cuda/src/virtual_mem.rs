@@ -23,13 +23,20 @@ impl Device {
     pub fn mem_prop(&self) -> MemProp {
         MemProp(CUmemAllocationProp {
             type_: CUmemAllocationType::CU_MEM_ALLOCATION_TYPE_PINNED,
+            #[cfg(nvidia)]
             requestedHandleTypes: CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_NONE,
+            #[cfg(iluvatar)]
+            requestedHandleTypes:
+                CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
             location: CUmemLocation {
                 type_: CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE,
                 id: unsafe { self.as_raw() },
             },
             win32HandleMetaData: null_mut(),
+            #[cfg(nvidia)]
             allocFlags: unsafe { std::mem::zeroed() },
+            #[cfg(iluvatar)]
+            reserved: 0,
         })
     }
 }
@@ -219,6 +226,7 @@ impl VirMem {
     }
 }
 
+#[cfg(not(iluvatar))] // TODO Iluvatar
 #[test]
 fn test_behavior() {
     use crate::{Device, memcpy_d2h, memcpy_h2d, virtual_mem::VirMem};

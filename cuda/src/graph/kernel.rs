@@ -1,7 +1,7 @@
-﻿use super::{Graph, GraphNode, KernelNode, collect_dependencies};
+﻿use super::{Graph, GraphNode, KernelNode};
 use crate::{Dim3, KernelFn, bindings::CUDA_KERNEL_NODE_PARAMS};
 use context_spore::AsRaw;
-use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
+use std::{ffi::c_void, ptr::null_mut};
 
 impl Graph {
     pub fn add_kernel_call<'a>(
@@ -25,7 +25,9 @@ impl Graph {
             sharedMemBytes: shared_mem as _,
             kernelParams: params.as_ptr() as _,
             extra: null_mut(),
+            #[cfg(nvidia)]
             kern: null_mut(),
+            #[cfg(nvidia)]
             ctx: null_mut(),
         };
 
@@ -37,10 +39,17 @@ impl Graph {
         node: &KernelNode,
         deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> KernelNode {
-        let mut params = unsafe { std::mem::zeroed() };
-        driver!(cuGraphKernelNodeGetParams_v2(node.as_raw(), &mut params));
-
-        self.add_kernel_node_with_params(&params, deps)
+        #[cfg(nvidia)]
+        {
+            let mut params = unsafe { std::mem::zeroed() };
+            driver!(cuGraphKernelNodeGetParams_v2(node.as_raw(), &mut params));
+            self.add_kernel_node_with_params(&params, deps)
+        }
+        #[cfg(iluvatar)]
+        {
+            let _ = (node, deps);
+            unimplemented!()
+        }
     }
 
     pub fn add_kernel_node_with_params<'a>(
@@ -48,16 +57,23 @@ impl Graph {
         params: &CUDA_KERNEL_NODE_PARAMS,
         deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> KernelNode {
-        let deps = collect_dependencies(deps);
-
-        let mut node = null_mut();
-        driver!(cuGraphAddKernelNode_v2(
-            &mut node,
-            self.as_raw(),
-            deps.as_ptr(),
-            deps.len(),
-            params,
-        ));
-        KernelNode(node, PhantomData)
+        #[cfg(nvidia)]
+        {
+            let deps = super::collect_dependencies(deps);
+            let mut node = null_mut();
+            driver!(cuGraphAddKernelNode_v2(
+                &mut node,
+                self.as_raw(),
+                deps.as_ptr(),
+                deps.len(),
+                params,
+            ));
+            KernelNode(node, std::marker::PhantomData)
+        }
+        #[cfg(iluvatar)]
+        {
+            let _ = (params, deps);
+            unimplemented!()
+        }
     }
 }

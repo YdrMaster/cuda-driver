@@ -1,19 +1,18 @@
-﻿mod free;
+﻿#[cfg(nvidia)]
+mod free;
 mod host_fn;
 mod kernel;
+#[cfg(nvidia)]
 mod malloc;
 mod memcpy;
 mod memset;
 
 use crate::{
     CurrentCtx, Stream,
-    bindings::{
-        CUgraph, CUgraphExec, CUgraphNode,
-        CUstreamCaptureMode::CU_STREAM_CAPTURE_MODE_THREAD_LOCAL as LOCAL,
-    },
+    bindings::{CUgraph, CUgraphExec, CUgraphNode},
 };
 use context_spore::{AsRaw, impl_spore};
-use std::{ffi::CString, marker::PhantomData, ops::Deref, path::Path, ptr::null_mut, str::FromStr};
+use std::{marker::PhantomData, ops::Deref, path::Path, ptr::null_mut};
 
 #[repr(transparent)]
 pub struct Graph(CUgraph);
@@ -25,7 +24,11 @@ pub struct CaptureStream<'ctx>(Stream<'ctx>);
 
 impl<'ctx> Stream<'ctx> {
     pub fn capture(self) -> CaptureStream<'ctx> {
-        driver!(cuStreamBeginCapture_v2(self.as_raw(), LOCAL));
+        #[cfg(nvidia)]
+        {
+            use crate::bindings::CUstreamCaptureMode::CU_STREAM_CAPTURE_MODE_THREAD_LOCAL as LOCAL;
+            driver!(cuStreamBeginCapture_v2(self.as_raw(), LOCAL));
+        }
         CaptureStream(self)
     }
 
@@ -81,8 +84,17 @@ impl AsRaw for Graph {
 
 impl Graph {
     pub fn save_dot(&self, path: impl AsRef<Path>) {
-        let path = CString::from_str(&path.as_ref().display().to_string()).unwrap();
-        driver!(cuGraphDebugDotPrint(self.0, path.as_ptr().cast(), u32::MAX))
+        #[cfg(nvidia)]
+        {
+            use std::{ffi::CString, str::FromStr};
+            let path = CString::from_str(path.as_ref().to_str().unwrap()).unwrap();
+            driver!(cuGraphDebugDotPrint(self.0, path.as_ptr().cast(), u32::MAX))
+        }
+        #[cfg(iluvatar)]
+        {
+            let _ = path;
+            unimplemented!()
+        }
     }
 
     pub fn nodes(&self) -> Vec<GraphNode> {
@@ -97,13 +109,21 @@ impl Graph {
 
 impl CurrentCtx {
     pub fn instantiate<'ctx>(&'ctx self, graph: &Graph) -> GraphExec<'ctx> {
-        let mut exec = null_mut();
-        driver!(cuGraphInstantiateWithFlags(
-            &mut exec,
-            graph.0,
-            CUgraphInstantiate_flags::CUDA_GRAPH_INSTANTIATE_FLAG_AUTO_FREE_ON_LAUNCH as _
-        ));
-        GraphExec(unsafe { self.wrap_raw(exec) }, PhantomData)
+        #[cfg(nvidia)]
+        {
+            let mut exec = null_mut();
+            driver!(cuGraphInstantiateWithFlags(
+                &mut exec,
+                graph.0,
+                CUgraphInstantiate_flags::CUDA_GRAPH_INSTANTIATE_FLAG_AUTO_FREE_ON_LAUNCH as _
+            ));
+            GraphExec(unsafe { self.wrap_raw(exec) }, PhantomData)
+        }
+        #[cfg(iluvatar)]
+        {
+            let _ = graph;
+            unimplemented!()
+        }
     }
 }
 
@@ -176,28 +196,36 @@ typed_node! {
 
 impl GraphNode<'_> {
     pub(super) fn new(raw: CUgraphNode) -> Self {
-        use crate::bindings::CUgraphNodeType as ty;
+        #[cfg(nvidia)]
+        {
+            use crate::bindings::CUgraphNodeType as ty;
 
-        let mut type_ = ty::CU_GRAPH_NODE_TYPE_EMPTY;
-        driver!(cuGraphNodeGetType(raw, &mut type_));
+            let mut type_ = ty::CU_GRAPH_NODE_TYPE_EMPTY;
+            driver!(cuGraphNodeGetType(raw, &mut type_));
 
-        #[rustfmt::skip]
-        let ans = match type_ {
-            ty::CU_GRAPH_NODE_TYPE_KERNEL           => Self::Kernel        (KernelNode        (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_MEM_ALLOC        => Self::MemAlloc      (MemAllocNode      (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_MEM_FREE         => Self::MemFree       (MemFreeNode       (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_MEMCPY           => Self::Memcpy        (MemcpyNode        (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_MEMSET           => Self::Memset        (MemsetNode        (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_HOST             => Self::HostFn        (HostFnNode        (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_GRAPH            => Self::SubGraph      (SubGraphNode      (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_EMPTY            => Self::Empty         (EmptyNode         (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_WAIT_EVENT       => Self::EventWait     (EventWaitNode     (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_EVENT_RECORD     => Self::EventRecord   (EventRecordNode   (raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_EXT_SEMAS_SIGNAL => Self::ExtSemasSignal(ExtSemasSignalNode(raw, PhantomData)),
-            ty::CU_GRAPH_NODE_TYPE_EXT_SEMAS_WAIT   => Self::ExtSemasWait  (ExtSemasWaitNode  (raw, PhantomData)),
-            _ => todo!(),
-        };
-        ans
+            #[rustfmt::skip]
+            let ans = match type_ {
+                ty::CU_GRAPH_NODE_TYPE_KERNEL           => Self::Kernel        (KernelNode        (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_MEM_ALLOC        => Self::MemAlloc      (MemAllocNode      (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_MEM_FREE         => Self::MemFree       (MemFreeNode       (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_MEMCPY           => Self::Memcpy        (MemcpyNode        (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_MEMSET           => Self::Memset        (MemsetNode        (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_HOST             => Self::HostFn        (HostFnNode        (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_GRAPH            => Self::SubGraph      (SubGraphNode      (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_EMPTY            => Self::Empty         (EmptyNode         (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_WAIT_EVENT       => Self::EventWait     (EventWaitNode     (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_EVENT_RECORD     => Self::EventRecord   (EventRecordNode   (raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_EXT_SEMAS_SIGNAL => Self::ExtSemasSignal(ExtSemasSignalNode(raw, PhantomData)),
+                ty::CU_GRAPH_NODE_TYPE_EXT_SEMAS_WAIT   => Self::ExtSemasWait  (ExtSemasWaitNode  (raw, PhantomData)),
+                _ => todo!(),
+            };
+            ans
+        }
+        #[cfg(iluvatar)]
+        {
+            let _ = raw;
+            unimplemented!()
+        }
     }
 }
 

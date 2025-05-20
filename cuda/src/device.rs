@@ -67,9 +67,11 @@ impl Device {
 
     #[inline]
     pub fn vm_supported(&self) -> bool {
-        self.get_attribute(
-            CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED,
-        ) != 0
+        #[cfg(nvidia)]
+        let attr = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED;
+        #[cfg(iluvatar)]
+        let attr = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED;
+        self.get_attribute(attr) != 0
     }
 
     #[inline]

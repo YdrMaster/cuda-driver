@@ -65,7 +65,7 @@ impl Cublas<'_> {
         c: *mut DevByte,
         ldc: isize,
     ) {
-        cublas!(cublasGemmEx_64(
+        cublas!(cublasGemmEx(
             self.0.rss,
             op(trans_a),
             op(trans_b),
@@ -115,7 +115,7 @@ impl Cublas<'_> {
         stride_a: isize,
         stride_b: isize,
     ) {
-        cublas!(cublasGemmStridedBatchedEx_64(
+        cublas!(cublasGemmStridedBatchedEx(
             self.0.rss,
             op(trans_a),
             op(trans_b),
