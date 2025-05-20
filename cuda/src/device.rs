@@ -8,6 +8,7 @@
 use context_spore::AsRaw;
 use std::{ffi::c_int, fmt};
 
+#[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct Device(CUdevice);
 

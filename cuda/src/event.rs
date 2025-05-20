@@ -33,8 +33,9 @@ impl AsRaw for Event<'_> {
 
 impl Stream<'_> {
     #[inline]
-    pub fn wait_for(&self, event: &Event) {
+    pub fn wait_for(&self, event: &Event) -> &Self {
         driver!(cuStreamWaitEvent(self.as_raw(), event.0.rss, 0));
+        self
     }
 
     pub fn bench(&self, mut f: impl FnMut(usize, &Self), times: usize, warm_up: usize) -> Duration {

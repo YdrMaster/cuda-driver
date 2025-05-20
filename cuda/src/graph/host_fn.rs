@@ -57,7 +57,7 @@ mod test {
         // 主机函数内部不得调用任何 CUDA API，否则可能返回 CUDA_ERROR_NOT_PERMITTED（但非强制要求）。
         extern "C" fn host_fn(e: *mut core::ffi::c_void) {
             let num: usize = unsafe { *e.cast::<usize>() };
-            println!("Hello World from CPU! num: {}", num);
+            println!("Hello World from CPU! num: {num}");
         }
 
         let one: usize = 1;
@@ -96,7 +96,7 @@ mod test {
         use context_spore::AsRaw;
         extern "C" fn host_fn(e: *mut core::ffi::c_void) {
             let num: usize = e as usize;
-            println!("Hello World from CPU! num: {}", num);
+            println!("Hello World from CPU! num: {num}");
         }
 
         if let Err(crate::NoDevice) = crate::init() {
@@ -112,7 +112,7 @@ mod test {
             driver!(cuLaunchHostFunc(
                 stream.as_raw(),
                 Some(host_fn as unsafe extern "C" fn(*mut core::ffi::c_void)),
-                1 as *mut core::ffi::c_void
+                std::ptr::dangling_mut(),
             ));
 
             stream.launch(&kernel, (1, 1, 0), &params![1].to_ptrs());
@@ -120,7 +120,7 @@ mod test {
             driver!(cuLaunchHostFunc(
                 stream.as_raw(),
                 Some(host_fn as unsafe extern "C" fn(*mut core::ffi::c_void)),
-                2 as *mut core::ffi::c_void
+                std::ptr::dangling_mut(),
             ));
 
             stream.launch(&kernel, (1, 1, 0), &params![2].to_ptrs());
@@ -137,7 +137,7 @@ mod test {
 
         extern "C" fn host_fn(e: *mut core::ffi::c_void) {
             let num: usize = e as usize;
-            println!("Hello World from CPU! num: {}", num);
+            println!("Hello World from CPU! num: {num}");
         }
 
         if let Err(crate::NoDevice) = crate::init() {
@@ -150,11 +150,9 @@ mod test {
 
             let graph = Graph::new();
 
-            let one: usize = 1;
-
             let cuda_host_node_params = CUDA_HOST_NODE_PARAMS {
                 fn_: Some(host_fn),
-                userData: one as *mut core::ffi::c_void,
+                userData: std::ptr::dangling_mut(),
             };
             let mut node = null_mut();
             driver!(cuGraphAddHostNode(
