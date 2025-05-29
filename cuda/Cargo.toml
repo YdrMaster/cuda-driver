@@ -14,12 +14,14 @@ log = "0.4"
 context-spore = "0.1"
 find_cuda_helper.workspace = true
 search-corex-tools.path = "../search-corex-tools"
+search-maca-tools.path = "../search-maca-tools"
 
 [build-dependencies]
 bindgen.workspace = true
 build-script-cfg.workspace = true
 find_cuda_helper.workspace = true
 search-corex-tools.path = "../search-corex-tools"
+search-maca-tools.path = "../search-maca-tools"
 
 [dev-dependencies]
 rand = "0.9"
