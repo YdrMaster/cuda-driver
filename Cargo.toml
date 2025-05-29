@@ -2,7 +2,7 @@
 members = [
     "cuda",
     "cublas",
-    # "nccl",
+    "nccl",
     "search-cuda-tools",
     "search-corex-tools",
     "search-maca-tools",
