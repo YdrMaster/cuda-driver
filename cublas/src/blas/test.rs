@@ -151,8 +151,6 @@ fn test_compute_batched() {
 
         let stream = ctx.stream();
         blas.set_stream(&stream);
-        #[cfg(iluvatar)]
-        return;
         unsafe {
             blas.gemm_batched(
                 3,
@@ -174,6 +172,8 @@ fn test_compute_batched() {
             )
         }
         check(&stream, &c);
+        #[cfg(iluvatar)]
+        return;
         // ----------------------------------------------------
         // 捕获计算图
         let stream = stream.capture();

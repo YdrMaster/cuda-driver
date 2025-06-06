@@ -1,4 +1,4 @@
-﻿use crate::{
+use crate::{
     DevByte, Device,
     bindings::{
         CUdeviceptr, CUmemAccess_flags, CUmemAccessDesc, CUmemAllocationGranularity_flags,
@@ -72,6 +72,11 @@ pub struct VirMem {
 impl VirMem {
     pub fn new(len: usize, min_addr: usize) -> Self {
         let mut ptr = 0;
+        #[cfg(iluvatar)]
+        Device::new(0).context().apply(|_| {
+            driver!(cuMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
+        });
+        #[cfg(not(iluvatar))]
         driver!(cuMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
         Self {
             ptr,
@@ -226,7 +231,6 @@ impl VirMem {
     }
 }
 
-#[cfg(not(iluvatar))] // TODO Iluvatar
 #[test]
 fn test_behavior() {
     use crate::{Device, memcpy_d2h, memcpy_h2d, virtual_mem::VirMem};

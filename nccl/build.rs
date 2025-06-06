@@ -1,22 +1,30 @@
-﻿fn main() {
-    use build_script_cfg::Cfg;
-    use search_cuda_tools::{find_cuda_root, find_nccl_root, include_cuda};
-    use std::{env, path::PathBuf};
+﻿use build_script_cfg::Cfg;
+use search_corex_tools::find_corex;
+use search_cuda_tools::{find_cuda_root, find_nccl_root};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
+fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
     let nccl = Cfg::new("detected_nccl");
-    let Some(cuda_root) = find_cuda_root() else {
-        return;
-    };
-    let Some(nccl_root) = find_nccl_root() else {
-        return;
-    };
-    nccl.define();
-    include_cuda();
+    if let Some(_toolkit) = find_corex() {
+        // TODO
+        // nccl.define();
+        // bind(toolkit, None)
+    } else if let Some(toolkit) = find_cuda_root() {
+        if let Some(nccl_) = find_nccl_root() {
+            nccl.define();
+            bind(toolkit, nccl_)
+        }
+    }
+}
 
-    let mut includes = vec![format!("-I{}/include", cuda_root.display())];
-    if let Some(nccl_root) = nccl_root {
+fn bind(toolkit: impl AsRef<Path>, nccl: Option<PathBuf>) {
+    let mut includes = vec![format!("-I{}/include", toolkit.as_ref().display())];
+    if let Some(nccl_root) = nccl {
         let nccl_root = nccl_root.display();
         includes.push(format!("-I{nccl_root}/include"));
         println!("cargo:rustc-link-search={nccl_root}/lib");

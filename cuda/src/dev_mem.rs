@@ -93,7 +93,6 @@ impl CurrentCtx {
     }
 }
 
-#[cfg(nvidia)]
 impl<'ctx> Stream<'ctx> {
     pub fn malloc<T: Copy>(&self, len: usize) -> DevMem<'ctx> {
         let len = Layout::array::<T>(len).unwrap().size();
@@ -118,7 +117,6 @@ impl<'ctx> Stream<'ctx> {
         )
     }
 
-    #[cfg(nvidia)]
     pub fn free(&self, mem: DevMem) -> &Self {
         driver!(cuMemFreeAsync(mem.0.rss.ptr, self.as_raw()));
         std::mem::forget(mem);

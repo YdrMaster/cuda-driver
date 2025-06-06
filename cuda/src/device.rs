@@ -141,7 +141,6 @@ impl Device {
         InfoFmt(self)
     }
 
-    #[cfg(nvidia)]
     pub fn set_mempool_threshold(&self, threshold: u64) {
         let mut mempool = std::ptr::null_mut();
         driver!(cuDeviceGetDefaultMemPool(&mut mempool, self.0));

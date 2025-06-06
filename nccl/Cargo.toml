@@ -14,3 +14,4 @@ digit-layout = "0.3"
 bindgen.workspace = true
 build-script-cfg.workspace = true
 search-cuda-tools.path = "../search-cuda-tools"
+search-corex-tools.path = "../search-corex-tools"

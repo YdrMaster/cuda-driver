@@ -105,7 +105,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
         .unwrap(),
     ];
     fn include_dir(dir: impl fmt::Display) -> CString {
-        CString::new(format!("-I{dir}\n")).unwrap()
+        CString::new(format!("-I{dir}")).unwrap()
     }
     #[cfg(nvidia)]
     {
