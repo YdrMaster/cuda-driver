@@ -266,3 +266,67 @@ fn test_behavior() {
 
     assert_eq!(&*host, &*host_)
 }
+
+// 测试unmap的时机，在kernel发射之后但在实际执行之前，应该会直接panic
+#[test]
+fn test_unmap() {
+    extern "C" fn host_fn(_e: *mut core::ffi::c_void) {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        println!("CPU fn finished!");
+    }
+    const CODE: &str = r#"extern "C" __global__ void print(int* p) { printf("Hello, world(%d)! from GPU\n", *p); }"#;
+    use crate::Ptx;
+    use crate::bindings::CUresult;
+    use crate::bindings::cuStreamSynchronize;
+    use crate::params;
+    use std::ptr::null_mut;
+    if let Err(crate::NoDevice) = crate::init() {
+        return;
+    }
+
+    let dev = Device::new(0);
+    let prop = dev.mem_prop();
+    let minium = prop.granularity_minimum();
+
+    dev.context().apply(|ctx| {
+        let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
+        let module = ctx.load(&ptx.unwrap());
+        let kernel = module.get_kernel(c"print");
+        // 创建虚拟内存
+        let mut dst_vir = VirMem::new(minium, 0);
+        let mut src_vir = VirMem::new(minium, 0);
+
+        // 映射虚拟内存
+        let dst = dst_vir.map(0, prop.create(minium));
+        let src = src_vir.map(0, prop.create(minium));
+
+        // 准备测试数据
+        // let _origin = (0..minium as u64 / size_of::<u64>() as u64).collect::<Box<_>>();
+        // memcpy_h2d(src, &_origin);
+
+        let stream = ctx.stream();
+        // 发射host函数，用于延时
+        driver!(cuLaunchHostFunc(
+            stream.as_raw(),
+            Some(host_fn as unsafe extern "C" fn(*mut core::ffi::c_void)),
+            null_mut()
+        ));
+
+        // 发射kernel或者进行拷贝，两者都会因为被unmap而失败
+        stream.launch(
+            &kernel,
+            (1, 1, 0),
+            &params![src.as_ptr() as *const _].to_ptrs(),
+        );
+
+        stream.memcpy_d2d(dst, src);
+
+        // 进行unmap，这之后kernel或者拷贝会失败
+        let _phy_dst = dst_vir.unmap(0);
+        let _phy_src = src_vir.unmap(0);
+        println!("Kernel launched - now unmap virtual memory ");
+
+        let result = unsafe { cuStreamSynchronize(stream.as_raw()) };
+        assert!(result != CUresult::CUDA_SUCCESS, "result = {result:?}");
+    });
+}
