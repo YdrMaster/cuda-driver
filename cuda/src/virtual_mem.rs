@@ -267,66 +267,81 @@ fn test_behavior() {
     assert_eq!(&*host, &*host_)
 }
 
-// 测试unmap的时机，在kernel发射之后但在实际执行之前，应该会直接panic
 #[test]
 fn test_unmap() {
-    extern "C" fn host_fn(_e: *mut core::ffi::c_void) {
-        std::thread::sleep(std::time::Duration::from_secs(3));
-        println!("CPU fn finished!");
-    }
-    const CODE: &str = r#"extern "C" __global__ void print(int* p) { printf("Hello, world(%d)! from GPU\n", *p); }"#;
-    use crate::Ptx;
-    use crate::bindings::CUresult;
-    use crate::bindings::cuStreamSynchronize;
-    use crate::params;
+    use crate::{
+        Ptx,
+        bindings::{CUresult, cuStreamSynchronize},
+        params,
+    };
     use std::ptr::null_mut;
+
+    extern "C" fn host_fn(_e: *mut core::ffi::c_void) {
+        for _ in 0..5 {
+            println!("waiting @ {:?}", std::thread::current());
+            std::thread::sleep(std::time::Duration::from_millis(200))
+        }
+        println!("Host fn finished!")
+    }
+
+    const CODE: &str = r#"
+extern "C" __global__ void print(int* p) {
+    printf("Read params [%d, %d, %d, %d]\n", p[0], p[1], p[2], p[3]);
+}
+
+extern "C" __global__ void add(int* p) {
+    for (int i = 0; i < 4; ++i) ++p[i];
+}"#;
+
     if let Err(crate::NoDevice) = crate::init() {
         return;
     }
 
     let dev = Device::new(0);
+    let (ptx, _log) = Ptx::compile(CODE, dev.compute_capability());
+
     let prop = dev.mem_prop();
     let minium = prop.granularity_minimum();
 
+    // 分配虚地址空间
+    let mut vir = VirMem::new(minium, 0);
+
     dev.context().apply(|ctx| {
-        let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
+        println!("host thread = {:?}", std::thread::current());
         let module = ctx.load(&ptx.unwrap());
-        let kernel = module.get_kernel(c"print");
-        // 创建虚拟内存
-        let mut dst_vir = VirMem::new(minium, 0);
-        let mut src_vir = VirMem::new(minium, 0);
+        let print = module.get_kernel(c"print");
+        let add = module.get_kernel(c"add");
 
         // 映射虚拟内存
-        let dst = dst_vir.map(0, prop.create(minium));
-        let src = src_vir.map(0, prop.create(minium));
-
-        // 准备测试数据
-        // let _origin = (0..minium as u64 / size_of::<u64>() as u64).collect::<Box<_>>();
-        // memcpy_h2d(src, &_origin);
+        let mem = vir.map(0, prop.create(minium));
 
         let stream = ctx.stream();
-        // 发射host函数，用于延时
+        // 发射 host 函数，用于延时
         driver!(cuLaunchHostFunc(
             stream.as_raw(),
-            Some(host_fn as unsafe extern "C" fn(*mut core::ffi::c_void)),
+            Some(host_fn as _),
             null_mut()
         ));
 
-        // 发射kernel或者进行拷贝，两者都会因为被unmap而失败
-        stream.launch(
-            &kernel,
-            (1, 1, 0),
-            &params![src.as_ptr() as *const _].to_ptrs(),
-        );
+        let attrs = ((), (), 0);
+        let params = params![mem.as_ptr()];
+        stream
+            .memcpy_h2d(&mut mem[..size_of::<[i32; 4]>()], &vec![0i32, 1, 2, 3])
+            .launch(&print, attrs, &params.to_ptrs())
+            .synchronize();
 
-        stream.memcpy_d2d(dst, src);
-
-        // 进行unmap，这之后kernel或者拷贝会失败
-        let _phy_dst = dst_vir.unmap(0);
-        let _phy_src = src_vir.unmap(0);
+        // 进行 unmap，这之后对虚地址的访问将失效
         println!("Kernel launched - now unmap virtual memory ");
+        vir.unmap(0);
+
+        // 发射 kernel 或者
+        stream
+            .launch(&add, attrs, &params.to_ptrs())
+            .launch(&print, attrs, &params.to_ptrs());
 
         let result = unsafe { cuStreamSynchronize(stream.as_raw()) };
         assert!(result != CUresult::CUDA_SUCCESS, "result = {result:?}");
-    });
+
+        std::mem::forget((stream, module))
+    })
 }
