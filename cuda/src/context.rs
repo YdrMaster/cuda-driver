@@ -222,7 +222,6 @@ fn test_primary() {
     assert!(pctx.is_null());
 }
 
-#[cfg(nvidia)]
 #[test]
 fn test_mem_info() {
     if let Err(crate::NoDevice) = crate::init() {
@@ -239,6 +238,8 @@ fn test_mem_info() {
         let (free, total) = ctx.mem_info();
         println!("mem info: {free}/{total}");
         // 释放的存储只会回到池中，驱动不可见
+        #[cfg(iluvatar)] // 天数的同步 API 不带自动同步，释放异步分配的内存会报错
+        stream.synchronize();
         drop(mem);
         let (free, total) = ctx.mem_info();
         println!("mem info: {free}/{total}")

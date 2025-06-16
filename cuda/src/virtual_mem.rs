@@ -267,6 +267,7 @@ fn test_behavior() {
     assert_eq!(&*host, &*host_)
 }
 
+#[cfg(nvidia)]
 #[test]
 fn test_unmap() {
     use crate::{
