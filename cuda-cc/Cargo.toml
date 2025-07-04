@@ -1,0 +1,8 @@
+[package]
+name = "cuda-cc"
+version = "0.0.0"
+edition.workspace = true
+authors = ["YdrMaster <ydrml@hotmail.com>"]
+
+[dependencies]
+bindgen.workspace = true

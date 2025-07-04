@@ -328,7 +328,7 @@ extern "C" __global__ void add(int* p) {
         let attrs = ((), (), 0);
         let params = params![mem.as_ptr()];
         stream
-            .memcpy_h2d(&mut mem[..size_of::<[i32; 4]>()], &vec![0i32, 1, 2, 3])
+            .memcpy_h2d(&mut mem[..size_of::<[i32; 4]>()], &[0i32, 1, 2, 3])
             .launch(&print, attrs, &params.to_ptrs())
             .synchronize();
 
