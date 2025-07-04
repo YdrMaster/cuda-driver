@@ -11,6 +11,6 @@ resolver = "3"
 package.edition = "2024"
 
 [workspace.dependencies]
-bindgen = "0.71"
+bindgen = "0.72"
 build-script-cfg = "0.1"
 find_cuda_helper = "0.2"

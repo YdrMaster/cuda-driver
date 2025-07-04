@@ -268,7 +268,8 @@ fn test_behavior() {
 }
 
 #[cfg(nvidia)]
-#[test]
+#[allow(unused)]
+// #[test] // 这个函数会毁坏 context，这会干扰其他线程上的其他 context，在并发情况下导致异常行为
 fn test_unmap() {
     use crate::{
         Ptx,

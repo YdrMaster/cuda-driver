@@ -41,6 +41,9 @@ mod test {
 
     const N: usize = 2 << 20;
 
+    /// cuda graph 的操作不能和发射操作同时进行，用互斥锁来规避
+    static MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test() {
         let group = match cuda::init() {
@@ -69,6 +72,8 @@ mod test {
             })
             .collect::<Vec<_>>();
 
+        let _guard = MUTEX.lock().unwrap();
+
         for (context, (stream, mem)) in zip(contexts, zip(streams, mem)) {
             context.apply(|ctx| {
                 ctx.synchronize();
@@ -85,6 +90,8 @@ mod test {
             Ok(()) if cuda::Device::count() >= 2 => CommunicatorGroup::new(&[0, 1]),
             _ => return,
         };
+
+        let _guard = MUTEX.lock().unwrap();
 
         let array = vec![1.0f32; N];
         std::thread::scope(|s| {
