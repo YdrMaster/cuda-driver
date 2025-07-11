@@ -1,7 +1,7 @@
 ﻿use super::{Graph, GraphNode, KernelNode};
 use crate::{
     Dim3, KernelFn,
-    bindings::{dim3, hcKernelNodeParams},
+    bindings::{dim3, mcKernelNodeParams},
 };
 use context_spore::AsRaw;
 use std::{ffi::c_void, ptr::null_mut};
@@ -27,7 +27,7 @@ impl Graph {
             y: block.y,
             z: block.z,
         };
-        let params = hcKernelNodeParams {
+        let params = mcKernelNodeParams {
             func: unsafe { f.as_raw().cast() },
             gridDim: num_blocks,
             blockDim: dim_blocks,
@@ -51,7 +51,7 @@ impl Graph {
         #[cfg(not(iluvatar))]
         {
             let mut params = unsafe { std::mem::zeroed() };
-            driver!(hcGraphKernelNodeGetParams(node.as_raw(), &mut params));
+            driver!(mcGraphKernelNodeGetParams(node.as_raw(), &mut params));
             self.add_kernel_node_with_params(&params, deps)
         }
         #[cfg(iluvatar)]
@@ -63,14 +63,14 @@ impl Graph {
 
     pub fn add_kernel_node_with_params<'a>(
         &self,
-        params: &hcKernelNodeParams,
+        params: &mcKernelNodeParams,
         deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
     ) -> KernelNode {
         #[cfg(not(iluvatar))]
         {
             let deps = super::collect_dependencies(deps);
             let mut node = null_mut();
-            driver!(hcGraphAddKernelNode(
+            driver!(mcGraphAddKernelNode(
                 &mut node,
                 self.as_raw(),
                 deps.as_ptr(),

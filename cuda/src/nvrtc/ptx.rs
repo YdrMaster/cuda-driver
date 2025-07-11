@@ -1,6 +1,6 @@
 use crate::{
     Version,
-    bindings::{hcrtcCompileProgram, hcrtcResult},
+    bindings::{mcrtcCompileProgram, mcrtcResult},
 };
 use std::{
     env::temp_dir,
@@ -16,7 +16,7 @@ use std::{
 pub struct Ptx(Vec<u8>);
 
 impl Ptx {
-    pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, hcrtcResult>, String) {
+    pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, mcrtcResult>, String) {
         let code = code.as_ref();
 
         let options = collect_options(code, cc);
@@ -44,7 +44,7 @@ impl Ptx {
             .unwrap()
         };
         let mut program = null_mut();
-        nvrtc!(hcrtcCreateProgram(
+        nvrtc!(mcrtcCreateProgram(
             &mut program,
             code.as_ptr().cast(),
             null(),
@@ -53,25 +53,25 @@ impl Ptx {
             null(),
         ));
 
-        let result = unsafe { hcrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
+        let result = unsafe { mcrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
         let log = {
             let mut log_len = 0;
-            nvrtc!(hcrtcGetProgramLogSize(program, &mut log_len));
+            nvrtc!(mcrtcGetProgramLogSize(program, &mut log_len));
             if log_len > 1 {
                 let mut log = vec![0u8; log_len];
-                nvrtc!(hcrtcGetProgramLog(program, log.as_mut_ptr().cast()));
+                nvrtc!(mcrtcGetProgramLog(program, log.as_mut_ptr().cast()));
                 log.pop();
                 std::str::from_utf8(&log).unwrap().trim().to_string()
             } else {
                 String::new()
             }
         };
-        let ans = if result == hcrtcResult::HCRTC_SUCCESS {
+        let ans = if result == mcrtcResult::MCRTC_SUCCESS {
             let mut ptx_len = 0;
-            nvrtc!(hcrtcGetBitcodeSize(program, &mut ptx_len));
+            nvrtc!(mcrtcGetBitcodeSize(program, &mut ptx_len));
             let mut ptx = vec![0u8; ptx_len];
-            nvrtc!(hcrtcGetBitcode(program, ptx.as_mut_ptr().cast()));
-            nvrtc!(hcrtcDestroyProgram(&mut program));
+            nvrtc!(mcrtcGetBitcode(program, ptx.as_mut_ptr().cast()));
+            nvrtc!(mcrtcDestroyProgram(&mut program));
             Ok(Self(ptx))
         } else {
             Err(result)

@@ -28,8 +28,8 @@ pub fn include_maca(path: impl AsRef<Path>) -> Option<MacaType> {
         println!("cargo:rustc-link-lib=dylib=mcruntime");
         println!("cargo:rustc-link-lib=dylib=mxc-runtime64");
         Some(MacaType::MX)
-    } else if bin.join("hpcc").is_file() {
-        println!("cargo:rustc-link-lib=dylib=hcruntime");
+    } else if bin.join("mxcc").is_file() {
+        println!("cargo:rustc-link-lib=dylib=mcruntime");
         println!("cargo:rustc-link-lib=dylib=htc-runtime64");
         Some(MacaType::HT)
     } else {

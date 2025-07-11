@@ -15,7 +15,7 @@ pub mod bindings {
             use $crate::bindings::*;
             #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
-            assert_eq!(err, hcclResult_t::hcclSuccess);
+            assert_eq!(err, mcclResult_t::mcclSuccess);
         }};
     }
 }
@@ -26,27 +26,27 @@ mod broadcast;
 mod communicator;
 mod group;
 
-pub use bindings::hcclRedOp_t as ReduceType;
+pub use bindings::mcclRedOp_t as ReduceType;
 pub use communicator::Communicator;
 pub use group::CommunicatorGroup;
 
-use bindings::hcclDataType_t;
+use bindings::mcclDataType_t;
 use digit_layout::DigitLayout;
 
 #[inline]
-fn convert(data_type: DigitLayout) -> hcclDataType_t {
+fn convert(data_type: DigitLayout) -> mcclDataType_t {
     use digit_layout::types as ty;
-    use hcclDataType_t::*;
+    use mcclDataType_t::*;
     match data_type {
-        ty::I8 => hcclInt8,
-        ty::U8 => hcclUint8,
-        ty::I32 => hcclInt32,
-        ty::U32 => hcclUint32,
-        ty::I64 => hcclInt64,
-        ty::U64 => hcclUint64,
-        ty::F16 => hcclFloat16,
-        ty::F32 => hcclFloat32,
-        ty::F64 => hcclFloat64,
+        ty::I8 => mcclInt8,
+        ty::U8 => mcclUint8,
+        ty::I32 => mcclInt32,
+        ty::U32 => mcclUint32,
+        ty::I64 => mcclInt64,
+        ty::U64 => mcclUint64,
+        ty::F16 => mcclFloat16,
+        ty::F32 => mcclFloat32,
+        ty::F64 => mcclFloat64,
         _ => panic!("{data_type} is not supported by NCCL"),
     }
 }

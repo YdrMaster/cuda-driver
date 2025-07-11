@@ -13,7 +13,7 @@ pub mod bindings {
             use $crate::bindings::*;
             #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
-            assert_eq!(err, hcblasStatus_t::HCBLAS_STATUS_SUCCESS)
+            assert_eq!(err, mcblasStatus_t::MCBLAS_STATUS_SUCCESS)
         }};
     }
 }

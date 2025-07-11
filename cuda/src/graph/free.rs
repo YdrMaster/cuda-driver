@@ -12,7 +12,7 @@ impl Graph {
         let deps = collect_dependencies(deps);
 
         let mut node = null_mut();
-        driver!(hcGraphAddMemFreeNode(
+        driver!(mcGraphAddMemFreeNode(
             &mut node,
             self.as_raw(),
             deps.as_ptr(),

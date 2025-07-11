@@ -85,12 +85,12 @@ fn bind_maca(toolkit: impl AsRef<Path>) {
         .clang_arg(format!("-I{}", include.display()))
         .clang_args(["-x", "c++"])
         // Only generate bindings for the functions in these namespaces.
-        .allowlist_function("hcrtc.*")
-        .allowlist_item("hc.*")
-        .allowlist_item("HC.*")
+        .allowlist_function("mcrtc.*")
+        .allowlist_item("mc.*")
+        .allowlist_item("MC.*")
         // Annotate the given type with the #[must_use] attribute.
-        .must_use_type("hcError_t")
-        .must_use_type("hcrtcResult")
+        .must_use_type("mcError_t")
+        .must_use_type("mcrtcResult")
         // Generate rust style enums.
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,

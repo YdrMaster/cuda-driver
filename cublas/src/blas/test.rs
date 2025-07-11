@@ -85,7 +85,7 @@ fn test_compute() {
         // 在 cuda graph 捕获期间不能释放捕获流上的 handle
         drop(blas);
         // 清空输出区域
-        driver!(hcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));
@@ -106,7 +106,7 @@ fn test_compute() {
         let graph = Graph::new();
         graph.add_kernel_node(&kernel, &[]);
         // 清空输出区域
-        driver!(hcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));
@@ -205,7 +205,7 @@ fn test_compute_batched() {
         // 在 cuda graph 捕获期间不能释放捕获流上的 handle
         drop(blas);
         // 清空输出区域
-        driver!(hcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));
@@ -226,7 +226,7 @@ fn test_compute_batched() {
         let graph = Graph::new();
         graph.add_kernel_node(&kernel, &[]);
         // 清空输出区域
-        driver!(hcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));

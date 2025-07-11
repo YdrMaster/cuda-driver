@@ -1,24 +1,24 @@
 ﻿mod matrix;
 mod multiply;
 
-use crate::bindings::{hcblasLtHandle_t, hcblasLtMatmulAlgo_t, hpccDataType_t};
+use crate::bindings::{macaDataType_t, mcblasLtHandle_t, mcblasLtMatmulAlgo_t};
 use cuda::{AsRaw, CurrentCtx, DevByte, Stream, impl_spore};
 use std::{ffi::c_void, marker::PhantomData, mem::size_of_val, ptr::null_mut};
 
 pub use matrix::{CublasLtMatrix, CublasLtMatrixLayout, MatrixOrder};
 pub use multiply::CublasLtMatMulDescriptor;
 
-impl_spore!(CublasLt and CublasLtSpore by (CurrentCtx, hcblasLtHandle_t));
+impl_spore!(CublasLt and CublasLtSpore by (CurrentCtx, mcblasLtHandle_t));
 
 impl Drop for CublasLt<'_> {
     #[inline]
     fn drop(&mut self) {
-        cublas!(hcblasLtDestroy(self.0.rss));
+        cublas!(mcblasLtDestroy(self.0.rss));
     }
 }
 
 impl AsRaw for CublasLt<'_> {
-    type Raw = hcblasLtHandle_t;
+    type Raw = mcblasLtHandle_t;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.rss
@@ -38,7 +38,7 @@ impl CublasLt<'_> {
     #[inline]
     pub fn new(ctx: &CurrentCtx) -> Self {
         let mut handle = null_mut();
-        cublas!(hcblasLtCreate(&mut handle));
+        cublas!(mcblasLtCreate(&mut handle));
         Self(unsafe { ctx.wrap_raw(handle) }, PhantomData)
     }
 
@@ -47,14 +47,14 @@ impl CublasLt<'_> {
         layout: CublasLtMatMulLayout,
         max_workspace: usize,
         request_count: usize,
-    ) -> Vec<(hcblasLtMatmulAlgo_t, usize)> {
+    ) -> Vec<(mcblasLtMatmulAlgo_t, usize)> {
         let workspace = max_workspace as u64;
 
         let mut preference = null_mut();
-        cublas!(hcblasLtMatmulPreferenceCreate(&mut preference));
-        cublas!(hcblasLtMatmulPreferenceSetAttribute(
+        cublas!(mcblasLtMatmulPreferenceCreate(&mut preference));
+        cublas!(mcblasLtMatmulPreferenceSetAttribute(
             preference,
-            hcblasLtMatmulPreferenceAttributes_t::HCBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+            mcblasLtMatmulPreferenceAttributes_t::MCBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
             (&raw const workspace).cast(),
             size_of_val(&workspace),
         ));
@@ -66,7 +66,7 @@ impl CublasLt<'_> {
         }
 
         let mut ans_n = 0;
-        cublas!(hcblasLtMatmulAlgoGetHeuristic(
+        cublas!(mcblasLtMatmulAlgoGetHeuristic(
             self.0.rss,
             layout.mat_mul.as_raw(),
             layout.a.as_raw(),
@@ -91,7 +91,7 @@ impl CublasLt<'_> {
         &self,
 
         layout: CublasLtMatMulLayout,
-        algo: hcblasLtMatmulAlgo_t,
+        algo: mcblasLtMatmulAlgo_t,
 
         d_ptr: *mut DevByte,
         alpha: f32,
@@ -103,18 +103,18 @@ impl CublasLt<'_> {
         workspace: &mut [DevByte],
         stream: &Stream,
     ) {
-        let mut dt = hpccDataType_t::HPCC_R_16F;
+        let mut dt = macaDataType_t::MACA_R_16F;
         let mut written = 0;
-        cublas!(hcblasLtMatmulDescGetAttribute(
+        cublas!(mcblasLtMatmulDescGetAttribute(
             layout.mat_mul.as_raw(),
-            hcblasLtMatmulDescAttributes_t::HCBLASLT_MATMUL_DESC_SCALE_TYPE,
+            mcblasLtMatmulDescAttributes_t::MCBLASLT_MATMUL_DESC_SCALE_TYPE,
             &mut dt as *mut _ as _,
             size_of_val(&dt),
             &mut written,
         ));
         assert_eq!(written, size_of_val(&dt));
 
-        cublas!(hcblasLtMatmul(
+        cublas!(mcblasLtMatmul(
             self.0.rss,
             layout.mat_mul.as_raw(),
             FloatScalar::convert(alpha, dt).as_ptr(),
@@ -152,12 +152,12 @@ impl FloatScalar {
         ans
     }
 
-    fn convert(val: f32, target: hpccDataType_t) -> Self {
+    fn convert(val: f32, target: macaDataType_t) -> Self {
         match target {
-            hpccDataType_t::HPCC_R_16F => Self::new(half::f16::from_f32(val)),
-            hpccDataType_t::HPCC_R_16BF => Self::new(half::bf16::from_f32(val)),
-            hpccDataType_t::HPCC_R_32F => Self::new(val),
-            hpccDataType_t::HPCC_R_64F => Self::new(val as f64),
+            macaDataType_t::MACA_R_16F => Self::new(half::f16::from_f32(val)),
+            macaDataType_t::MACA_R_16BF => Self::new(half::bf16::from_f32(val)),
+            macaDataType_t::MACA_R_32F => Self::new(val),
+            macaDataType_t::MACA_R_64F => Self::new(val as f64),
             _ => unimplemented!(),
         }
     }

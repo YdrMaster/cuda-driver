@@ -13,10 +13,10 @@ pub mod bindings {
             use $crate::bindings::*;
             #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
-            assert_eq!(err, hcError_t::$expected);
+            assert_eq!(err, mcError_t::$expected);
         }};
 
-        ($f:expr) => {{ driver!(hcSuccess, $f) }};
+        ($f:expr) => {{ driver!(mcSuccess, $f) }};
     }
 
     #[macro_export]
@@ -26,7 +26,7 @@ pub mod bindings {
             use $crate::bindings::*;
             #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
-            assert_eq!(err, hcrtcResult::HCRTC_SUCCESS);
+            assert_eq!(err, mcrtcResult::MCRTC_SUCCESS);
         }};
     }
 }
@@ -46,17 +46,17 @@ mod virtual_mem;
 pub struct NoDevice;
 
 pub fn init() -> Result<(), NoDevice> {
-    use bindings::{hcError_t::*, hcInit};
-    match unsafe { hcInit(0) } {
-        hcSuccess => Ok(()),
-        hcErrorInvalidDevice => Err(NoDevice),
-        e => panic!("Failed to initialize HCDA: {e:?}"),
+    use bindings::{mcError_t::*, mcInit};
+    match unsafe { mcInit(0) } {
+        mcSuccess => Ok(()),
+        mcErrorInvalidDevice => Err(NoDevice),
+        e => panic!("Failed to initialize MCDA: {e:?}"),
     }
 }
 
 pub fn version() -> Version {
     let mut version = 0;
-    driver!(hcDriverGetVersion(&mut version));
+    driver!(mcDriverGetVersion(&mut version));
     Version {
         major: version / 1000,
         minor: version % 1000 / 10,
@@ -199,5 +199,5 @@ impl From<usize> for MemSize {
 
 #[test]
 fn test_version() {
-    println!("HC version: {}", version())
+    println!("MC version: {}", version())
 }

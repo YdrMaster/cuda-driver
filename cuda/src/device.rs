@@ -1,8 +1,8 @@
 ﻿use crate::{
     Dim3, MemSize, Version,
     bindings::{
-        HCdevice,
-        hcDeviceAttribute_t::{self, *},
+        MCdevice,
+        mcDeviceAttribute_t::{self, *},
     },
 };
 use context_spore::AsRaw;
@@ -10,10 +10,10 @@ use std::{ffi::c_int, fmt};
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct Device(HCdevice);
+pub struct Device(MCdevice);
 
 impl AsRaw for Device {
-    type Raw = HCdevice;
+    type Raw = MCdevice;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -24,20 +24,20 @@ impl Device {
     #[inline]
     pub fn new(index: c_int) -> Self {
         let mut device = 0;
-        driver!(hcDeviceGet(&mut device, index));
+        driver!(mcDeviceGet(&mut device, index));
         Self(device)
     }
 
     #[inline]
     pub fn count() -> usize {
         let mut count = 0;
-        driver!(hcGetDeviceCount(&mut count));
+        driver!(mcGetDeviceCount(&mut count));
         count as _
     }
 
     pub fn name(&self) -> String {
         let mut name = [0u8; 256];
-        driver!(hcDeviceGetName(
+        driver!(mcDeviceGetName(
             name.as_mut_ptr().cast(),
             name.len() as _,
             self.0
@@ -53,15 +53,15 @@ impl Device {
     #[inline]
     pub fn compute_capability(&self) -> Version {
         Version {
-            major: self.get_attribute(hcDeviceAttributeComputeCapabilityMajor),
-            minor: self.get_attribute(hcDeviceAttributeComputeCapabilityMinor),
+            major: self.get_attribute(mcDeviceAttributeComputeCapabilityMajor),
+            minor: self.get_attribute(mcDeviceAttributeComputeCapabilityMinor),
         }
     }
 
     #[inline]
     pub fn total_memory(&self) -> MemSize {
         let mut bytes = 0;
-        driver!(hcDeviceTotalMem(&mut bytes, self.0));
+        driver!(mcDeviceTotalMem(&mut bytes, self.0));
         bytes.into()
     }
 
@@ -72,53 +72,53 @@ impl Device {
         #[cfg(iluvatar)]
         let attr = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED;
         #[cfg(metax)]
-        let attr = hcDeviceAttribute_t::hcDeviceAttributeVirtualMemoryManagementSupported;
+        let attr = mcDeviceAttribute_t::mcDeviceAttributeVirtualMemoryManagementSupported;
         self.get_attribute(attr) != 0
     }
 
     #[inline]
     pub fn alignment(&self) -> usize {
-        self.get_attribute(hcDeviceAttributeTextureAlignment) as _
+        self.get_attribute(mcDeviceAttributeTextureAlignment) as _
     }
 
     #[inline]
     pub fn warp_size(&self) -> usize {
-        self.get_attribute(hcDeviceAttributeWarpSize) as _
+        self.get_attribute(mcDeviceAttributeWarpSize) as _
     }
 
     #[inline]
     pub fn sm_count(&self) -> usize {
-        self.get_attribute(hcDeviceAttributeMultiProcessorCount) as _
+        self.get_attribute(mcDeviceAttributeMultiProcessorCount) as _
     }
 
     pub fn max_grid_dims(&self) -> Dim3 {
         Dim3 {
-            x: self.get_attribute(hcDeviceAttributeMaxGridDimX) as _,
-            y: self.get_attribute(hcDeviceAttributeMaxGridDimY) as _,
-            z: self.get_attribute(hcDeviceAttributeMaxGridDimZ) as _,
+            x: self.get_attribute(mcDeviceAttributeMaxGridDimX) as _,
+            y: self.get_attribute(mcDeviceAttributeMaxGridDimY) as _,
+            z: self.get_attribute(mcDeviceAttributeMaxGridDimZ) as _,
         }
     }
 
     pub fn block_limit(&self) -> BlockLimit {
         BlockLimit {
-            max_threads: self.get_attribute(hcDeviceAttributeMaxThreadsPerBlock) as _,
+            max_threads: self.get_attribute(mcDeviceAttributeMaxThreadsPerBlock) as _,
             max_dims: Dim3 {
-                x: self.get_attribute(hcDeviceAttributeMaxBlockDimX) as _,
-                y: self.get_attribute(hcDeviceAttributeMaxBlockDimY) as _,
-                z: self.get_attribute(hcDeviceAttributeMaxBlockDimZ) as _,
+                x: self.get_attribute(mcDeviceAttributeMaxBlockDimX) as _,
+                y: self.get_attribute(mcDeviceAttributeMaxBlockDimY) as _,
+                z: self.get_attribute(mcDeviceAttributeMaxBlockDimZ) as _,
             },
             max_smem: self
-                .get_attribute(hcDeviceAttributeMaxSharedMemoryPerBlock)
+                .get_attribute(mcDeviceAttributeMaxSharedMemoryPerBlock)
                 .into(),
             max_smem_optin: self
-                .get_attribute(hcDeviceAttributeMaxSharedMemoryPerBlockOptin)
+                .get_attribute(mcDeviceAttributeMaxSharedMemoryPerBlockOptin)
                 .into(),
             // #[cfg(nvidia)]
             reserved_smem: self
-                .get_attribute(hcDeviceAttributeReservedSharedMemoryPerBlock)
+                .get_attribute(mcDeviceAttributeReservedSharedMemoryPerBlock)
                 .into(),
             max_registers: self
-                .get_attribute(hcDeviceAttributeMaxRegistersPerBlock)
+                .get_attribute(mcDeviceAttributeMaxRegistersPerBlock)
                 .into(),
         }
     }
@@ -126,13 +126,13 @@ impl Device {
     pub fn sm_limit(&self) -> SMLimit {
         SMLimit {
             // #[cfg(nvidia)]
-            max_blocks: self.get_attribute(hcDevAttrMaxBlocksPerMultiprocessor) as _,
-            max_threads: self.get_attribute(hcDeviceAttributeMaxThreadsPerMultiProcessor) as _,
+            max_blocks: self.get_attribute(mcDevAttrMaxBlocksPerMultiprocessor) as _,
+            max_threads: self.get_attribute(mcDeviceAttributeMaxThreadsPerMultiProcessor) as _,
             max_smem: self
-                .get_attribute(hcDeviceAttributeMaxSharedMemoryPerMultiprocessor)
+                .get_attribute(mcDeviceAttributeMaxSharedMemoryPerMultiprocessor)
                 .into(),
             max_registers: self
-                .get_attribute(hcDeviceAttributeMaxRegistersPerMultiprocessor)
+                .get_attribute(mcDeviceAttributeMaxRegistersPerMultiprocessor)
                 .into(),
         }
     }
@@ -144,18 +144,18 @@ impl Device {
 
     pub fn set_mempool_threshold(&self, threshold: u64) {
         let mut mempool = std::ptr::null_mut();
-        driver!(hcDeviceGetDefaultMemPool(&mut mempool, self.0));
-        driver!(hcMemPoolSetAttribute(
+        driver!(mcDeviceGetDefaultMemPool(&mut mempool, self.0));
+        driver!(mcMemPoolSetAttribute(
             mempool,
-            hcMemPoolAttr::hcMemPoolAttrReleaseThreshold,
+            mcMemPoolAttr::mcMemPoolAttrReleaseThreshold,
             (&raw const threshold) as _,
         ));
     }
 
     #[inline]
-    fn get_attribute(&self, attr: hcDeviceAttribute_t) -> c_int {
+    fn get_attribute(&self, attr: mcDeviceAttribute_t) -> c_int {
         let mut value = 0;
-        driver!(hcDeviceGetAttribute(&mut value, attr, self.0));
+        driver!(mcDeviceGetAttribute(&mut value, attr, self.0));
         value
     }
 }

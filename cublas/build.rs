@@ -75,11 +75,9 @@ fn bind_cuda(toolkit: impl AsRef<Path>, _x_cxx: bool) {
 
 fn bind_maca(toolkit: impl AsRef<Path>) {
     let toolkit = toolkit.as_ref();
-    println!("cargo:rustc-link-lib=dylib=hcblas");
-    println!("cargo:rustc-link-lib=dylib=hcblasLt");
+    println!("cargo:rustc-link-lib=dylib=mcblas");
+    println!("cargo:rustc-link-lib=dylib=mcblasLt");
 
-    println!("cargo:rustc-link-lib=dylib=hcruntime");
-    println!("cargo:rustc-link-lib=dylib=htc-runtime64");
     // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper_maca.h");
 
@@ -90,13 +88,15 @@ fn bind_maca(toolkit: impl AsRef<Path>) {
         // The input header we would like to generate bindings for.
         .header("wrapper_maca.h")
         .clang_arg(format!("-I{}", toolkit.join("include").display()))
-        // .clang_arg("-x hpcc")
+        .clang_arg(format!("-I{}", toolkit.join("include/common").display()))
+        .clang_arg(format!("-I{}", toolkit.join("include/mcr").display()))
+        // .clang_arg("-x mxcc")
         .clang_args(["-x", "c++"])
         // Only generate bindings for the functions in these namespaces.
-        .allowlist_function("hcblas.*")
-        .allowlist_item("hcblas.*")
+        .allowlist_function("mcblas.*")
+        .allowlist_item("mcblas.*")
         // Annotate the given type with the #[must_use] attribute.
-        .must_use_type("hcblasStatus_t")
+        .must_use_type("mcblasStatus_t")
         // Generate rust style enums.
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,

@@ -14,7 +14,7 @@ fn main() {
     if let Some(maca) = find_maca_root() {
         nccl.define();
         include_maca(&maca);
-        bind_hccl(maca)
+        bind_mccl(maca)
     } else if let Some(_toolkit) = find_corex() {
         // TODO
         // nccl.define();
@@ -71,10 +71,8 @@ fn bind(toolkit: impl AsRef<Path>, nccl: Option<PathBuf>) {
         .expect("Couldn't write bindings!");
 }
 
-fn bind_hccl(maca: impl AsRef<Path>) {
-    println!("cargo:rustc-link-lib=dylib=hccl");
-    println!("cargo:rustc-link-lib=dylib=hcruntime");
-    println!("cargo:rustc-link-lib=dylib=htc-runtime64");
+fn bind_mccl(maca: impl AsRef<Path>) {
+    println!("cargo:rustc-link-lib=dylib=mccl");
     // Tell cargo to invalidate the built crate whenever the wrapper changes.
     println!("cargo:rerun-if-changed=wrapper_maca.h");
 
@@ -88,11 +86,11 @@ fn bind_hccl(maca: impl AsRef<Path>) {
         .clang_arg("-x")
         .clang_arg("c++")
         // Only generate bindings for the functions in these namespaces.
-        // .clang_arg("-x hpcc")
-        .allowlist_function("hccl.*")
-        .allowlist_item("hccl.*")
+        // .clang_arg("-x mxcc")
+        .allowlist_function("mccl.*")
+        .allowlist_item("mccl.*")
         // Annotate the given type with the #[must_use] attribute.
-        .must_use_type("hcclResult_t")
+        .must_use_type("mcclResult_t")
         // Generate rust style enums.
         .default_enum_style(bindgen::EnumVariation::Rust {
             non_exhaustive: true,

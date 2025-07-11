@@ -1,9 +1,9 @@
 use crate::{
     DevByte, Device,
     bindings::{
-        HCdeviceptr, hcMemAccessDesc, hcMemAccessFlags, hcMemAllocationGranularity_flags,
-        hcMemAllocationHandleType, hcMemAllocationProp, hcMemAllocationType,
-        hcMemGenericAllocationHandle, hcMemLocation, hcMemLocationType,
+        MCdeviceptr, mcMemAccessDesc, mcMemAccessFlags, mcMemAllocationGranularity_flags,
+        mcMemAllocationHandleType, mcMemAllocationProp, mcMemAllocationType,
+        mcMemGenericAllocationHandle, mcMemLocation, mcMemLocationType,
     },
 };
 use context_spore::AsRaw;
@@ -18,19 +18,19 @@ use std::{
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct MemProp(hcMemAllocationProp);
+pub struct MemProp(mcMemAllocationProp);
 
 impl Device {
     pub fn mem_prop(&self) -> MemProp {
-        MemProp(hcMemAllocationProp {
-            type_: hcMemAllocationType::hcMemAllocationTypePinned,
+        MemProp(mcMemAllocationProp {
+            type_: mcMemAllocationType::mcMemAllocationTypePinned,
             #[cfg(not(iluvatar))]
-            requestedHandleTypes: hcMemAllocationHandleType::hcMemHandleTypeNone,
+            requestedHandleTypes: mcMemAllocationHandleType::mcMemHandleTypeNone,
             #[cfg(iluvatar)]
             requestedHandleTypes:
                 CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
-            location: hcMemLocation {
-                type_: hcMemLocationType::hcMemLocationTypeDevice,
+            location: mcMemLocation {
+                type_: mcMemLocationType::mcMemLocationTypeDevice,
                 id: unsafe { self.as_raw() },
             },
             win32HandleMetaData: null_mut(),
@@ -45,17 +45,17 @@ impl Device {
 impl MemProp {
     #[inline]
     pub fn granularity_minimum(&self) -> usize {
-        self.granularity(hcMemAllocationGranularity_flags::HC_MEM_ALLOC_GRANULARITY_MINIMUM)
+        self.granularity(mcMemAllocationGranularity_flags::MC_MEM_ALLOC_GRANULARITY_MINIMUM)
     }
 
     #[inline]
     pub fn granularity_recommended(&self) -> usize {
-        self.granularity(hcMemAllocationGranularity_flags::HC_MEM_ALLOC_GRANULARITY_RECOMMENDED)
+        self.granularity(mcMemAllocationGranularity_flags::MC_MEM_ALLOC_GRANULARITY_RECOMMENDED)
     }
 
-    fn granularity(&self, type_: hcMemAllocationGranularity_flags) -> usize {
+    fn granularity(&self, type_: mcMemAllocationGranularity_flags) -> usize {
         let mut size = 0;
-        driver!(hcMemGetAllocationGranularity(&mut size, &self.0, type_));
+        driver!(mcMemGetAllocationGranularity(&mut size, &self.0, type_));
         size
     }
 }
@@ -64,7 +64,7 @@ impl MemProp {
 pub struct VirByte(u8);
 
 pub struct VirMem {
-    ptr: HCdeviceptr,
+    ptr: MCdeviceptr,
     len: usize,
     /// offset -> phy
     map: BTreeMap<usize, PhyRegion>,
@@ -73,7 +73,7 @@ pub struct VirMem {
 impl VirMem {
     pub fn new(len: usize, min_addr: usize) -> Self {
         let mut ptr = null_mut();
-        driver!(hcMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
+        driver!(mcMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
         Self {
             ptr: ptr as _,
             len,
@@ -102,23 +102,23 @@ impl Drop for VirMem {
         let map = std::mem::take(map);
         for (offset, region) in map {
             if let PhyRegion::Mapped(phy) = region {
-                driver!(hcMemUnmap((*ptr + offset as HCdeviceptr) as _, phy.len))
+                driver!(mcMemUnmap((*ptr + offset as MCdeviceptr) as _, phy.len))
             }
         }
-        driver!(hcMemAddressFree(*ptr as *mut c_void, *len))
+        driver!(mcMemAddressFree(*ptr as *mut c_void, *len))
     }
 }
 
 pub struct PhyMem {
-    location: hcMemLocation,
-    handle: hcMemGenericAllocationHandle,
+    location: mcMemLocation,
+    handle: mcMemGenericAllocationHandle,
     len: usize,
 }
 
 impl MemProp {
     pub fn create(&self, len: usize) -> Arc<PhyMem> {
         let mut handle = 0;
-        driver!(hcMemCreate(&mut handle, len, &self.0, 0));
+        driver!(mcMemCreate(&mut handle, len, &self.0, 0));
         Arc::new(PhyMem {
             location: self.0.location,
             handle,
@@ -130,12 +130,12 @@ impl MemProp {
 impl Drop for PhyMem {
     fn drop(&mut self) {
         let &mut Self { handle, .. } = self;
-        driver!(hcMemRelease(handle))
+        driver!(mcMemRelease(handle))
     }
 }
 
 impl AsRaw for PhyMem {
-    type Raw = hcMemGenericAllocationHandle;
+    type Raw = mcMemGenericAllocationHandle;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.handle
@@ -185,13 +185,13 @@ impl VirMem {
         assert!(phy.len <= len);
         // 映射
         {
-            let ptr = self.ptr + offset as HCdeviceptr;
-            driver!(hcMemMap(ptr as _, phy.len, 0, phy.handle, 0));
-            let desc = hcMemAccessDesc {
+            let ptr = self.ptr + offset as MCdeviceptr;
+            driver!(mcMemMap(ptr as _, phy.len, 0, phy.handle, 0));
+            let desc = mcMemAccessDesc {
                 location: phy.location,
-                flags: hcMemAccessFlags::hcMemAccessFlagsProtReadWrite,
+                flags: mcMemAccessFlags::mcMemAccessFlagsProtReadWrite,
             };
-            driver!(hcMemSetAccess(ptr as _, phy.len, &desc, 1));
+            driver!(mcMemSetAccess(ptr as _, phy.len, &desc, 1));
         }
         // 移除空闲段
         let head = *head;
@@ -209,7 +209,7 @@ impl VirMem {
             let tail = head + head_len + phy_len;
             self.map.insert(tail, tail_len.into());
         }
-        unsafe { std::slice::from_raw_parts_mut((self.ptr + offset as HCdeviceptr) as _, phy_len) }
+        unsafe { std::slice::from_raw_parts_mut((self.ptr + offset as MCdeviceptr) as _, phy_len) }
     }
 
     pub fn unmap(&mut self, offset: usize) -> Arc<PhyMem> {
@@ -221,8 +221,8 @@ impl VirMem {
         let PhyRegion::Mapped(phy) = std::mem::replace(region, len.into()) else {
             unreachable!()
         };
-        let ptr = self.ptr + offset as HCdeviceptr;
-        driver!(hcMemUnmap(ptr as _, phy.len));
+        let ptr = self.ptr + offset as MCdeviceptr;
+        driver!(mcMemUnmap(ptr as _, phy.len));
         phy
     }
 }

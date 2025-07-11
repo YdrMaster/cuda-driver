@@ -70,7 +70,7 @@ fn test_behavior() {
     let code = CString::new(src).unwrap();
     let ptx = {
         let mut program = null_mut();
-        nvrtc!(hcrtcCreateProgram(
+        nvrtc!(mcrtcCreateProgram(
             &mut program,
             code.as_ptr().cast(),
             null(),
@@ -78,15 +78,15 @@ fn test_behavior() {
             null(),
             null(),
         ));
-        nvrtc!(hcrtcCompileProgram(program, 0, null()));
+        nvrtc!(mcrtcCompileProgram(program, 0, null()));
 
         let mut ptx_len = 0;
-        nvrtc!(hcrtcGetBitcodeSize(program, &mut ptx_len));
+        nvrtc!(mcrtcGetBitcodeSize(program, &mut ptx_len));
         println!("ptx_len = {ptx_len}");
 
         let mut ptx = vec![0u8; ptx_len];
-        nvrtc!(hcrtcGetBitcode(program, ptx.as_mut_ptr().cast()));
-        nvrtc!(hcrtcDestroyProgram(&mut program));
+        nvrtc!(mcrtcGetBitcode(program, ptx.as_mut_ptr().cast()));
+        nvrtc!(mcrtcDestroyProgram(&mut program));
         ptx
     };
     let ptx = ptx.as_slice();
@@ -99,9 +99,9 @@ fn test_behavior() {
         return;
     }
     crate::Device::new(0).context().apply(|_| {
-        driver!(hcModuleLoadData(&mut m, ptx.as_ptr().cast()));
-        driver!(hcModuleGetFunction(&mut f, m, name.as_ptr()));
+        driver!(mcModuleLoadData(&mut m, ptx.as_ptr().cast()));
+        driver!(mcModuleGetFunction(&mut f, m, name.as_ptr()));
         #[rustfmt::skip]
-        driver!(hcModuleLaunchKernel(f, 1, 1, 1, 1, 1, 1, 0, null_mut(), null_mut(), null_mut()));
+        driver!(mcModuleLaunchKernel(f, 1, 1, 1, 1, 1, 1, 0, null_mut(), null_mut(), null_mut()));
     });
 }

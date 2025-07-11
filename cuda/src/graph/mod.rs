@@ -10,15 +10,15 @@ mod memset;
 
 use crate::{
     CurrentCtx, Stream,
-    bindings::{HCgraph, HCgraphExec, HCgraphNode},
+    bindings::{MCgraph, MCgraphExec, MCgraphNode},
 };
 use context_spore::{AsRaw, impl_spore};
 use std::{marker::PhantomData, ops::Deref, path::Path, ptr::null_mut};
 
 #[repr(transparent)]
-pub struct Graph(HCgraph);
+pub struct Graph(MCgraph);
 
-impl_spore!(GraphExec and GraphExecSpore by (CurrentCtx, HCgraphExec));
+impl_spore!(GraphExec and GraphExecSpore by (CurrentCtx, MCgraphExec));
 
 #[repr(transparent)]
 pub struct CaptureStream<'ctx>(Stream<'ctx>);
@@ -27,14 +27,14 @@ impl<'ctx> Stream<'ctx> {
     pub fn capture(self) -> CaptureStream<'ctx> {
         #[cfg(not(iluvatar))]
         {
-            use crate::bindings::hcStreamCaptureMode::hcStreamCaptureModeThreadLocal as LOCAL;
-            driver!(hcStreamBeginCapture(self.as_raw(), LOCAL))
+            use crate::bindings::mcStreamCaptureMode::mcStreamCaptureModeThreadLocal as LOCAL;
+            driver!(mcStreamBeginCapture(self.as_raw(), LOCAL))
         }
         CaptureStream(self)
     }
 
     pub fn launch_graph(&self, graph: &GraphExec) -> &Self {
-        driver!(hcGraphLaunch(graph.0.rss, self.as_raw()));
+        driver!(mcGraphLaunch(graph.0.rss, self.as_raw()));
         self
     }
 }
@@ -42,7 +42,7 @@ impl<'ctx> Stream<'ctx> {
 impl CaptureStream<'_> {
     pub fn end(self) -> Graph {
         let mut graph = null_mut();
-        driver!(hcStreamEndCapture(self.0.as_raw(), &mut graph));
+        driver!(mcStreamEndCapture(self.0.as_raw(), &mut graph));
         Graph(graph)
     }
 }
@@ -58,7 +58,7 @@ impl<'ctx> Deref for CaptureStream<'ctx> {
 impl Graph {
     pub fn new() -> Self {
         let mut graph = null_mut();
-        driver!(hcGraphCreate(&mut graph, 0));
+        driver!(mcGraphCreate(&mut graph, 0));
         Self(graph)
     }
 }
@@ -71,12 +71,12 @@ impl Default for Graph {
 
 impl Drop for Graph {
     fn drop(&mut self) {
-        driver!(hcGraphDestroy(self.0))
+        driver!(mcGraphDestroy(self.0))
     }
 }
 
 impl AsRaw for Graph {
-    type Raw = HCgraph;
+    type Raw = MCgraph;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -89,7 +89,7 @@ impl Graph {
         {
             use std::{ffi::CString, str::FromStr};
             let path = CString::from_str(&path.as_ref().display().to_string()).unwrap();
-            driver!(hcGraphDebugDotPrint(self.0, path.as_ptr().cast(), u32::MAX))
+            driver!(mcGraphDebugDotPrint(self.0, path.as_ptr().cast(), u32::MAX))
         }
         #[cfg(iluvatar)]
         {
@@ -100,9 +100,9 @@ impl Graph {
 
     pub fn nodes(&self) -> Vec<GraphNode> {
         let mut num = 0;
-        driver!(hcGraphGetNodes(self.0, null_mut(), &mut num));
+        driver!(mcGraphGetNodes(self.0, null_mut(), &mut num));
         let mut ans = vec![null_mut(); num];
-        driver!(hcGraphGetNodes(self.0, ans.as_mut_ptr(), &mut num));
+        driver!(mcGraphGetNodes(self.0, ans.as_mut_ptr(), &mut num));
         assert_eq!(num, ans.len());
         ans.into_iter().map(GraphNode::new).collect()
     }
@@ -113,10 +113,10 @@ impl CurrentCtx {
         #[cfg(not(iluvatar))]
         {
             let mut exec = null_mut();
-            driver!(hcGraphInstantiateWithFlags(
+            driver!(mcGraphInstantiateWithFlags(
                 &mut exec,
                 graph.0,
-                hcGraphInstantiateFlags::hcGraphInstantiateFlagAutoFreeOnLaunch as _
+                mcGraphInstantiateFlags::mcGraphInstantiateFlagAutoFreeOnLaunch as _
             ));
             GraphExec(unsafe { self.wrap_raw(exec) }, PhantomData)
         }
@@ -130,12 +130,12 @@ impl CurrentCtx {
 
 impl Drop for GraphExec<'_> {
     fn drop(&mut self) {
-        driver!(hcGraphExecDestroy(self.0.rss))
+        driver!(mcGraphExecDestroy(self.0.rss))
     }
 }
 
 impl AsRaw for GraphExec<'_> {
-    type Raw = HCgraphExec;
+    type Raw = MCgraphExec;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.rss
@@ -161,10 +161,10 @@ macro_rules! typed_node {
     ($( $name:ident )+) => {
         $(
             #[repr(transparent)]
-            pub struct $name<'g>(HCgraphNode, PhantomData<&'g ()>);
+            pub struct $name<'g>(MCgraphNode, PhantomData<&'g ()>);
 
             impl AsRaw for $name<'_> {
-                type Raw = HCgraphNode;
+                type Raw = MCgraphNode;
                 #[inline]
                 unsafe fn as_raw(&self) -> Self::Raw {
                     self.0
@@ -196,28 +196,28 @@ typed_node! {
 }
 
 impl GraphNode<'_> {
-    pub(super) fn new(raw: HCgraphNode) -> Self {
+    pub(super) fn new(raw: MCgraphNode) -> Self {
         #[cfg(not(iluvatar))]
         {
-            use crate::bindings::hcGraphNodeType as ty;
+            use crate::bindings::mcGraphNodeType as ty;
 
-            let mut type_ = ty::hcGraphNodeTypeEmpty;
-            driver!(hcGraphNodeGetType(raw, &mut type_));
+            let mut type_ = ty::mcGraphNodeTypeEmpty;
+            driver!(mcGraphNodeGetType(raw, &mut type_));
 
             #[rustfmt::skip]
             let ans = match type_ {
-                ty::hcGraphNodeTypeKernel             => Self::Kernel        (KernelNode        (raw, PhantomData)),
-                ty::hcGraphNodeTypeMemAlloc           => Self::MemAlloc      (MemAllocNode      (raw, PhantomData)),
-                ty::hcGraphNodeTypeMemFree            => Self::MemFree       (MemFreeNode       (raw, PhantomData)),
-                ty::hcGraphNodeTypeMemcpy             => Self::Memcpy        (MemcpyNode        (raw, PhantomData)),
-                ty::hcGraphNodeTypeMemset             => Self::Memset        (MemsetNode        (raw, PhantomData)),
-                ty::hcGraphNodeTypeHost               => Self::HostFn        (HostFnNode        (raw, PhantomData)),
-                ty::hcGraphNodeTypeGraph              => Self::SubGraph      (SubGraphNode      (raw, PhantomData)),
-                ty::hcGraphNodeTypeEmpty              => Self::Empty         (EmptyNode         (raw, PhantomData)),
-                ty::hcGraphNodeTypeWaitEvent          => Self::EventWait     (EventWaitNode     (raw, PhantomData)),
-                ty::hcGraphNodeTypeEventRecord        => Self::EventRecord   (EventRecordNode   (raw, PhantomData)),
-                ty::hcGraphNodeTypeExtSemaphoreSignal => Self::ExtSemasSignal(ExtSemasSignalNode(raw, PhantomData)),
-                ty::hcGraphNodeTypeExtSemaphoreWait   => Self::ExtSemasWait  (ExtSemasWaitNode  (raw, PhantomData)),
+                ty::mcGraphNodeTypeKernel             => Self::Kernel        (KernelNode        (raw, PhantomData)),
+                ty::mcGraphNodeTypeMemAlloc           => Self::MemAlloc      (MemAllocNode      (raw, PhantomData)),
+                ty::mcGraphNodeTypeMemFree            => Self::MemFree       (MemFreeNode       (raw, PhantomData)),
+                ty::mcGraphNodeTypeMemcpy             => Self::Memcpy        (MemcpyNode        (raw, PhantomData)),
+                ty::mcGraphNodeTypeMemset             => Self::Memset        (MemsetNode        (raw, PhantomData)),
+                ty::mcGraphNodeTypeHost               => Self::HostFn        (HostFnNode        (raw, PhantomData)),
+                ty::mcGraphNodeTypeGraph              => Self::SubGraph      (SubGraphNode      (raw, PhantomData)),
+                ty::mcGraphNodeTypeEmpty              => Self::Empty         (EmptyNode         (raw, PhantomData)),
+                ty::mcGraphNodeTypeWaitEvent          => Self::EventWait     (EventWaitNode     (raw, PhantomData)),
+                ty::mcGraphNodeTypeEventRecord        => Self::EventRecord   (EventRecordNode   (raw, PhantomData)),
+                ty::mcGraphNodeTypeExtSemaphoreSignal => Self::ExtSemasSignal(ExtSemasSignalNode(raw, PhantomData)),
+                ty::mcGraphNodeTypeExtSemaphoreWait   => Self::ExtSemasWait  (ExtSemasWaitNode  (raw, PhantomData)),
                 _ => todo!(),
             };
             ans
@@ -231,7 +231,7 @@ impl GraphNode<'_> {
 }
 
 impl AsRaw for GraphNode<'_> {
-    type Raw = HCgraphNode;
+    type Raw = MCgraphNode;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         macro_rules! case {
@@ -261,7 +261,7 @@ impl AsRaw for GraphNode<'_> {
 
 fn collect_dependencies<'a>(
     deps: impl IntoIterator<Item = &'a GraphNode<'a>>,
-) -> Box<[HCgraphNode]> {
+) -> Box<[MCgraphNode]> {
     deps.into_iter().map(|n| unsafe { n.as_raw() }).collect()
 }
 
@@ -277,18 +277,18 @@ mod test {
         }
         // 不需要在上下文中创建和释放 cuda graph
         let mut graph = null_mut();
-        driver!(hcGraphCreate(&mut graph, 0));
+        driver!(mcGraphCreate(&mut graph, 0));
         assert!(!graph.is_null());
         // 但 cuda graph 实例化需要在上下文中
         let mut exec = null_mut();
         // metax 不会报错
-        driver!(hcGraphInstantiateWithFlags(
+        driver!(mcGraphInstantiateWithFlags(
             &mut exec,
             graph,
-            hcGraphInstantiateFlags::hcGraphInstantiateFlagAutoFreeOnLaunch as _
+            mcGraphInstantiateFlags::mcGraphInstantiateFlagAutoFreeOnLaunch as _
         ));
         // √
-        driver!(hcGraphDestroy(graph))
+        driver!(mcGraphDestroy(graph))
     }
 
     #[test]

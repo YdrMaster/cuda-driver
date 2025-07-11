@@ -1,16 +1,16 @@
-﻿use crate::bindings::hpccDataType_t;
+﻿use crate::bindings::macaDataType_t;
 use half::{bf16, f16};
 use std::{ffi::c_void, marker::PhantomData};
 
 #[cfg(not(iluvatar))]
-type CublasComputeType = crate::bindings::hcblasComputeType_t;
+type CublasComputeType = crate::bindings::mcblasComputeType_t;
 #[cfg(iluvatar)]
 type CublasComputeType = crate::bindings::cudaDataType;
 
 pub trait Computation {
-    fn a_type(&self) -> hpccDataType_t;
-    fn b_type(&self) -> hpccDataType_t;
-    fn c_type(&self) -> hpccDataType_t;
+    fn a_type(&self) -> macaDataType_t;
+    fn b_type(&self) -> macaDataType_t;
+    fn c_type(&self) -> macaDataType_t;
     fn compute_type(&self) -> CublasComputeType;
     fn alpha(&self) -> &c_void;
     fn beta(&self) -> &c_void;
@@ -73,19 +73,19 @@ impl_gemm_scheme!( f32 => |x| x as _    );
 impl_gemm_scheme!( f64 => |x| x         );
 
 macro_rules! impl_computation {
-    ($data:ty => $hc_ty:ident; $compute:ty => $hcblas_ty:ident) => {
+    ($data:ty => $mc_ty:ident; $compute:ty => $mcblas_ty:ident) => {
         impl Computation for GemmScheme<$data, $compute> {
-            fn a_type(&self) -> hpccDataType_t {
-                hpccDataType_t::$hc_ty
+            fn a_type(&self) -> macaDataType_t {
+                macaDataType_t::$mc_ty
             }
-            fn b_type(&self) -> hpccDataType_t {
-                hpccDataType_t::$hc_ty
+            fn b_type(&self) -> macaDataType_t {
+                macaDataType_t::$mc_ty
             }
-            fn c_type(&self) -> hpccDataType_t {
-                hpccDataType_t::$hc_ty
+            fn c_type(&self) -> macaDataType_t {
+                macaDataType_t::$mc_ty
             }
             fn compute_type(&self) -> CublasComputeType {
-                CublasComputeType::$hcblas_ty
+                CublasComputeType::$mcblas_ty
             }
             fn alpha(&self) -> &c_void {
                 unsafe { &*(&raw const self.alpha).cast() }
@@ -98,15 +98,15 @@ macro_rules! impl_computation {
 }
 
 #[cfg(not(iluvatar))]
-impl_computation!( f16 => HPCC_R_16F ; f16 => HCBLAS_COMPUTE_16F);
+impl_computation!( f16 => MACA_R_16F ; f16 => MCBLAS_COMPUTE_16F);
 #[cfg(not(iluvatar))]
-impl_computation!( f16 => HPCC_R_16F ; f32 => HCBLAS_COMPUTE_32F);
+impl_computation!( f16 => MACA_R_16F ; f32 => MCBLAS_COMPUTE_32F);
 #[cfg(not(iluvatar))]
-impl_computation!(bf16 => HPCC_R_16BF; f32 => HCBLAS_COMPUTE_32F);
+impl_computation!(bf16 => MACA_R_16BF; f32 => MCBLAS_COMPUTE_32F);
 #[cfg(not(iluvatar))]
-impl_computation!( f32 => HPCC_R_32F ; f32 => HCBLAS_COMPUTE_32F);
+impl_computation!( f32 => MACA_R_32F ; f32 => MCBLAS_COMPUTE_32F);
 #[cfg(not(iluvatar))]
-impl_computation!( f64 => HPCC_R_64F ; f64 => HCBLAS_COMPUTE_64F);
+impl_computation!( f64 => MACA_R_64F ; f64 => MCBLAS_COMPUTE_64F);
 
 #[cfg(iluvatar)]
 impl_computation!( f16 => CUDA_R_16F ; f16 => CUDA_R_16F);
@@ -119,21 +119,21 @@ impl_computation!( f32 => CUDA_R_32F ; f32 => CUDA_R_32F);
 #[cfg(iluvatar)]
 impl_computation!( f64 => CUDA_R_64F ; f64 => CUDA_R_64F);
 pub struct ComputationValue {
-    a: hpccDataType_t,
-    b: hpccDataType_t,
-    c: hpccDataType_t,
+    a: macaDataType_t,
+    b: macaDataType_t,
+    c: macaDataType_t,
     compute: CublasComputeType,
     data: [u64; 2],
 }
 
 impl Computation for ComputationValue {
-    fn a_type(&self) -> hpccDataType_t {
+    fn a_type(&self) -> macaDataType_t {
         self.a
     }
-    fn b_type(&self) -> hpccDataType_t {
+    fn b_type(&self) -> macaDataType_t {
         self.b
     }
-    fn c_type(&self) -> hpccDataType_t {
+    fn c_type(&self) -> macaDataType_t {
         self.c
     }
     fn compute_type(&self) -> CublasComputeType {
