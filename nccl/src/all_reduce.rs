@@ -13,7 +13,7 @@ impl Communicator {
     ) {
         let size = dst.len();
         let recvbuff = dst.as_mut_ptr().cast();
-        nccl!(ncclAllReduce(
+        nccl!(hcclAllReduce(
             if let Some(src) = src {
                 assert_eq!(src.len(), size);
                 src.as_ptr() as _
@@ -66,7 +66,7 @@ mod test {
                     let stream = streams[i].sprout_ref(ctx);
                     let mut mem = stream.malloc::<f32>(N);
                     stream.memcpy_h2d(&mut mem, &array);
-                    comm.all_reduce(&mut mem, None, F32, ReduceType::ncclSum, stream);
+                    comm.all_reduce(&mut mem, None, F32, ReduceType::hcclSum, stream);
                     mem.sporulate()
                 })
             })
@@ -110,7 +110,7 @@ mod test {
                                 &mut mem,
                                 None,
                                 types::F32,
-                                ReduceType::ncclSum,
+                                ReduceType::hcclSum,
                                 &stream,
                             );
                             stream.end()
