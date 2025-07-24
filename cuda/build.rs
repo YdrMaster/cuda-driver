@@ -14,10 +14,10 @@ fn main() {
     let iluvatar = Cfg::new("iluvatar");
     let metax = Cfg::new("metax");
 
-    if let Some(maca) = find_maca_root() {
+    if let Some(pair) = find_maca_root() {
         metax.define();
-        include_maca(&maca);
-        bind_maca(maca);
+        include_maca(&pair);
+        bind_maca(pair.1);
     } else if let Some(corex) = find_corex() {
         iluvatar.define();
         include_corex(&corex);
