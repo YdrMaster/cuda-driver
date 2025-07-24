@@ -26,19 +26,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: cuda-toolkit
-        uses: Jimver/cuda-toolkit@v0.2.18
-        with:
-          method: 'network'
-
       - name: Use latest toolchain
         run: rustup update
 
       - name: Check format
         run: cargo fmt --check
-
-      - name: Run test
-        run: cargo test --release
 
       - name: Install required cargo
         run: cargo install clippy-sarif sarif-fmt
