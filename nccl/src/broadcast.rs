@@ -13,7 +13,7 @@ impl Communicator {
     ) {
         let size = dst.len();
         let recvbuff = dst.as_mut_ptr().cast::<c_void>();
-        nccl!(ncclBroadcast(
+        nccl!(mcclBroadcast(
             if let Some(src) = src {
                 assert_eq!(src.len(), size);
                 src.as_ptr().cast()
@@ -22,7 +22,7 @@ impl Communicator {
             },
             recvbuff,
             size,
-            ncclDataType_t::ncclUint8,
+            mcclDataType_t::mcclUint8,
             root,
             self.as_raw(),
             stream.as_raw() as _,

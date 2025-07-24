@@ -1,15 +1,16 @@
 use crate::{
     DevByte, Device,
     bindings::{
-        CUdeviceptr, CUmemAccess_flags, CUmemAccessDesc, CUmemAllocationGranularity_flags,
-        CUmemAllocationHandleType, CUmemAllocationProp, CUmemAllocationType,
-        CUmemGenericAllocationHandle, CUmemLocation, CUmemLocationType,
+        MCdeviceptr, mcMemAccessDesc, mcMemAccessFlags, mcMemAllocationGranularity_flags,
+        mcMemAllocationHandleType, mcMemAllocationProp, mcMemAllocationType,
+        mcMemGenericAllocationHandle, mcMemLocation, mcMemLocationType,
     },
 };
 use context_spore::AsRaw;
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
+    os::raw::c_void,
     ptr::null_mut,
     slice::{from_raw_parts, from_raw_parts_mut},
     sync::Arc,
@@ -17,23 +18,23 @@ use std::{
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct MemProp(CUmemAllocationProp);
+pub struct MemProp(mcMemAllocationProp);
 
 impl Device {
     pub fn mem_prop(&self) -> MemProp {
-        MemProp(CUmemAllocationProp {
-            type_: CUmemAllocationType::CU_MEM_ALLOCATION_TYPE_PINNED,
-            #[cfg(nvidia)]
-            requestedHandleTypes: CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_NONE,
+        MemProp(mcMemAllocationProp {
+            type_: mcMemAllocationType::mcMemAllocationTypePinned,
+            #[cfg(not(iluvatar))]
+            requestedHandleTypes: mcMemAllocationHandleType::mcMemHandleTypeNone,
             #[cfg(iluvatar)]
             requestedHandleTypes:
                 CUmemAllocationHandleType::CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
-            location: CUmemLocation {
-                type_: CUmemLocationType::CU_MEM_LOCATION_TYPE_DEVICE,
+            location: mcMemLocation {
+                type_: mcMemLocationType::mcMemLocationTypeDevice,
                 id: unsafe { self.as_raw() },
             },
             win32HandleMetaData: null_mut(),
-            #[cfg(nvidia)]
+            #[cfg(not(iluvatar))]
             allocFlags: unsafe { std::mem::zeroed() },
             #[cfg(iluvatar)]
             reserved: 0,
@@ -44,17 +45,17 @@ impl Device {
 impl MemProp {
     #[inline]
     pub fn granularity_minimum(&self) -> usize {
-        self.granularity(CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_MINIMUM)
+        self.granularity(mcMemAllocationGranularity_flags::MC_MEM_ALLOC_GRANULARITY_MINIMUM)
     }
 
     #[inline]
     pub fn granularity_recommended(&self) -> usize {
-        self.granularity(CUmemAllocationGranularity_flags::CU_MEM_ALLOC_GRANULARITY_RECOMMENDED)
+        self.granularity(mcMemAllocationGranularity_flags::MC_MEM_ALLOC_GRANULARITY_RECOMMENDED)
     }
 
-    fn granularity(&self, type_: CUmemAllocationGranularity_flags) -> usize {
+    fn granularity(&self, type_: mcMemAllocationGranularity_flags) -> usize {
         let mut size = 0;
-        driver!(cuMemGetAllocationGranularity(&mut size, &self.0, type_));
+        driver!(mcMemGetAllocationGranularity(&mut size, &self.0, type_));
         size
     }
 }
@@ -63,7 +64,7 @@ impl MemProp {
 pub struct VirByte(u8);
 
 pub struct VirMem {
-    ptr: CUdeviceptr,
+    ptr: MCdeviceptr,
     len: usize,
     /// offset -> phy
     map: BTreeMap<usize, PhyRegion>,
@@ -71,15 +72,10 @@ pub struct VirMem {
 
 impl VirMem {
     pub fn new(len: usize, min_addr: usize) -> Self {
-        let mut ptr = 0;
-        #[cfg(iluvatar)]
-        Device::new(0).context().apply(|_| {
-            driver!(cuMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
-        });
-        #[cfg(not(iluvatar))]
-        driver!(cuMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
+        let mut ptr = null_mut();
+        driver!(mcMemAddressReserve(&mut ptr, len, 0, min_addr as _, 0));
         Self {
-            ptr,
+            ptr: ptr as _,
             len,
             map: [(0, len.into())].into(),
         }
@@ -106,23 +102,23 @@ impl Drop for VirMem {
         let map = std::mem::take(map);
         for (offset, region) in map {
             if let PhyRegion::Mapped(phy) = region {
-                driver!(cuMemUnmap(*ptr + offset as CUdeviceptr, phy.len))
+                driver!(mcMemUnmap((*ptr + offset as MCdeviceptr) as _, phy.len))
             }
         }
-        driver!(cuMemAddressFree(*ptr, *len))
+        driver!(mcMemAddressFree(*ptr as *mut c_void, *len))
     }
 }
 
 pub struct PhyMem {
-    location: CUmemLocation,
-    handle: CUmemGenericAllocationHandle,
+    location: mcMemLocation,
+    handle: mcMemGenericAllocationHandle,
     len: usize,
 }
 
 impl MemProp {
     pub fn create(&self, len: usize) -> Arc<PhyMem> {
         let mut handle = 0;
-        driver!(cuMemCreate(&mut handle, len, &self.0, 0));
+        driver!(mcMemCreate(&mut handle, len, &self.0, 0));
         Arc::new(PhyMem {
             location: self.0.location,
             handle,
@@ -134,12 +130,12 @@ impl MemProp {
 impl Drop for PhyMem {
     fn drop(&mut self) {
         let &mut Self { handle, .. } = self;
-        driver!(cuMemRelease(handle))
+        driver!(mcMemRelease(handle))
     }
 }
 
 impl AsRaw for PhyMem {
-    type Raw = CUmemGenericAllocationHandle;
+    type Raw = mcMemGenericAllocationHandle;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.handle
@@ -189,13 +185,13 @@ impl VirMem {
         assert!(phy.len <= len);
         // 映射
         {
-            let ptr = self.ptr + offset as CUdeviceptr;
-            driver!(cuMemMap(ptr, phy.len, 0, phy.handle, 0));
-            let desc = CUmemAccessDesc {
+            let ptr = self.ptr + offset as MCdeviceptr;
+            driver!(mcMemMap(ptr as _, phy.len, 0, phy.handle, 0));
+            let desc = mcMemAccessDesc {
                 location: phy.location,
-                flags: CUmemAccess_flags::CU_MEM_ACCESS_FLAGS_PROT_READWRITE,
+                flags: mcMemAccessFlags::mcMemAccessFlagsProtReadWrite,
             };
-            driver!(cuMemSetAccess(ptr, phy.len, &desc, 1));
+            driver!(mcMemSetAccess(ptr as _, phy.len, &desc, 1));
         }
         // 移除空闲段
         let head = *head;
@@ -213,7 +209,7 @@ impl VirMem {
             let tail = head + head_len + phy_len;
             self.map.insert(tail, tail_len.into());
         }
-        unsafe { std::slice::from_raw_parts_mut((self.ptr + offset as CUdeviceptr) as _, phy_len) }
+        unsafe { std::slice::from_raw_parts_mut((self.ptr + offset as MCdeviceptr) as _, phy_len) }
     }
 
     pub fn unmap(&mut self, offset: usize) -> Arc<PhyMem> {
@@ -225,8 +221,8 @@ impl VirMem {
         let PhyRegion::Mapped(phy) = std::mem::replace(region, len.into()) else {
             unreachable!()
         };
-        let ptr = self.ptr + offset as CUdeviceptr;
-        driver!(cuMemUnmap(ptr, phy.len));
+        let ptr = self.ptr + offset as MCdeviceptr;
+        driver!(mcMemUnmap(ptr as _, phy.len));
         phy
     }
 }

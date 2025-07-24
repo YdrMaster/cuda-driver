@@ -1,4 +1,4 @@
-#![cfg(any(nvidia, iluvatar))]
+#![cfg(any(nvidia, iluvatar, metax))]
 #![deny(warnings)]
 
 #[macro_use]
@@ -13,7 +13,7 @@ pub mod bindings {
             use $crate::bindings::*;
             #[allow(unused_unsafe, clippy::macro_metavars_in_unsafe)]
             let err = unsafe { $f };
-            assert_eq!(err, cublasStatus_t::CUBLAS_STATUS_SUCCESS)
+            assert_eq!(err, mcblasStatus_t::MCBLAS_STATUS_SUCCESS)
         }};
     }
 }
@@ -21,9 +21,9 @@ pub mod bindings {
 mod blas;
 pub use blas::{Computation, Cublas, CublasSpore, GemmScheme};
 
-#[cfg(nvidia)]
+#[cfg(not(iluvatar))]
 mod cublaslt;
-#[cfg(nvidia)]
+#[cfg(not(iluvatar))]
 pub use cublaslt::{
     CublasLt, CublasLtMatMulDescriptor, CublasLtMatrix, CublasLtMatrixLayout, CublasLtSpore,
     MatrixOrder,

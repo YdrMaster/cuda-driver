@@ -1,4 +1,4 @@
-﻿#![cfg_attr(iluvatar, allow(unreachable_code, unused))]
+﻿#![cfg_attr(not(nvidia), allow(unreachable_code, unused))]
 
 use super::{Cublas, GemmScheme};
 use cuda::{DevByte, Device, Graph, GraphNode, Stream, driver};
@@ -85,13 +85,15 @@ fn test_compute() {
         // 在 cuda graph 捕获期间不能释放捕获流上的 handle
         drop(blas);
         // 清空输出区域
-        driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));
         // 测试计算正确
         check(&stream, &c);
         // ----------------------------------------------------
+        #[cfg(metax)]
+        return;
         // 已知：当且仅当 b 转置，生成的计算图中不是单个 kernel
         let mut nodes = graph.nodes().into_iter();
         let Some(GraphNode::Kernel(kernel)) = nodes.next() else {
@@ -104,7 +106,7 @@ fn test_compute() {
         let graph = Graph::new();
         graph.add_kernel_node(&kernel, &[]);
         // 清空输出区域
-        driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));
@@ -203,13 +205,15 @@ fn test_compute_batched() {
         // 在 cuda graph 捕获期间不能释放捕获流上的 handle
         drop(blas);
         // 清空输出区域
-        driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));
         // 测试计算正确
         check(&stream, &c);
         // ----------------------------------------------------
+        #[cfg(metax)]
+        return;
         // 已知：当且仅当 b 转置，生成的计算图中不是单个 kernel
         let mut nodes = graph.nodes().into_iter();
         let Some(GraphNode::Kernel(kernel)) = nodes.next() else {
@@ -222,7 +226,7 @@ fn test_compute_batched() {
         let graph = Graph::new();
         graph.add_kernel_node(&kernel, &[]);
         // 清空输出区域
-        driver!(cuMemsetD8_v2(c.as_mut_ptr() as _, 0, c.len()));
+        driver!(mcMemsetD8(c.as_mut_ptr() as _, 0, c.len()));
         // 执行计算图
         let stream = ctx.stream();
         stream.launch_graph(&ctx.instantiate(&graph));

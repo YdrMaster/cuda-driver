@@ -1,8 +1,8 @@
 ﻿use crate::{
     Dim3, MemSize, Version,
     bindings::{
-        CUdevice,
-        CUdevice_attribute::{self, *},
+        MCdevice,
+        mcDeviceAttribute_t::{self, *},
     },
 };
 use context_spore::AsRaw;
@@ -10,10 +10,10 @@ use std::{ffi::c_int, fmt};
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct Device(CUdevice);
+pub struct Device(MCdevice);
 
 impl AsRaw for Device {
-    type Raw = CUdevice;
+    type Raw = MCdevice;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -24,20 +24,20 @@ impl Device {
     #[inline]
     pub fn new(index: c_int) -> Self {
         let mut device = 0;
-        driver!(cuDeviceGet(&mut device, index));
+        driver!(mcDeviceGet(&mut device, index));
         Self(device)
     }
 
     #[inline]
     pub fn count() -> usize {
         let mut count = 0;
-        driver!(cuDeviceGetCount(&mut count));
+        driver!(mcGetDeviceCount(&mut count));
         count as _
     }
 
     pub fn name(&self) -> String {
         let mut name = [0u8; 256];
-        driver!(cuDeviceGetName(
+        driver!(mcDeviceGetName(
             name.as_mut_ptr().cast(),
             name.len() as _,
             self.0
@@ -53,15 +53,15 @@ impl Device {
     #[inline]
     pub fn compute_capability(&self) -> Version {
         Version {
-            major: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR),
-            minor: self.get_attribute(CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR),
+            major: self.get_attribute(mcDeviceAttributeComputeCapabilityMajor),
+            minor: self.get_attribute(mcDeviceAttributeComputeCapabilityMinor),
         }
     }
 
     #[inline]
     pub fn total_memory(&self) -> MemSize {
         let mut bytes = 0;
-        driver!(cuDeviceTotalMem_v2(&mut bytes, self.0));
+        driver!(mcDeviceTotalMem(&mut bytes, self.0));
         bytes.into()
     }
 
@@ -71,67 +71,68 @@ impl Device {
         let attr = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED;
         #[cfg(iluvatar)]
         let attr = CUdevice_attribute::CU_DEVICE_ATTRIBUTE_VIRTUAL_ADDRESS_MANAGEMENT_SUPPORTED;
+        #[cfg(metax)]
+        let attr = mcDeviceAttribute_t::mcDeviceAttributeVirtualMemoryManagementSupported;
         self.get_attribute(attr) != 0
     }
 
     #[inline]
     pub fn alignment(&self) -> usize {
-        self.get_attribute(CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT) as _
+        self.get_attribute(mcDeviceAttributeTextureAlignment) as _
     }
 
     #[inline]
     pub fn warp_size(&self) -> usize {
-        self.get_attribute(CU_DEVICE_ATTRIBUTE_WARP_SIZE) as _
+        self.get_attribute(mcDeviceAttributeWarpSize) as _
     }
 
     #[inline]
     pub fn sm_count(&self) -> usize {
-        self.get_attribute(CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT) as _
+        self.get_attribute(mcDeviceAttributeMultiProcessorCount) as _
     }
 
     pub fn max_grid_dims(&self) -> Dim3 {
         Dim3 {
-            x: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X) as _,
-            y: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Y) as _,
-            z: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Z) as _,
+            x: self.get_attribute(mcDeviceAttributeMaxGridDimX) as _,
+            y: self.get_attribute(mcDeviceAttributeMaxGridDimY) as _,
+            z: self.get_attribute(mcDeviceAttributeMaxGridDimZ) as _,
         }
     }
 
     pub fn block_limit(&self) -> BlockLimit {
         BlockLimit {
-            max_threads: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK) as _,
+            max_threads: self.get_attribute(mcDeviceAttributeMaxThreadsPerBlock) as _,
             max_dims: Dim3 {
-                x: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X) as _,
-                y: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y) as _,
-                z: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z) as _,
+                x: self.get_attribute(mcDeviceAttributeMaxBlockDimX) as _,
+                y: self.get_attribute(mcDeviceAttributeMaxBlockDimY) as _,
+                z: self.get_attribute(mcDeviceAttributeMaxBlockDimZ) as _,
             },
             max_smem: self
-                .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK)
+                .get_attribute(mcDeviceAttributeMaxSharedMemoryPerBlock)
                 .into(),
             max_smem_optin: self
-                .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN)
+                .get_attribute(mcDeviceAttributeMaxSharedMemoryPerBlockOptin)
                 .into(),
-            #[cfg(nvidia)]
+            // #[cfg(nvidia)]
             reserved_smem: self
-                .get_attribute(CU_DEVICE_ATTRIBUTE_RESERVED_SHARED_MEMORY_PER_BLOCK)
+                .get_attribute(mcDeviceAttributeReservedSharedMemoryPerBlock)
                 .into(),
             max_registers: self
-                .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_REGISTERS_PER_BLOCK)
+                .get_attribute(mcDeviceAttributeMaxRegistersPerBlock)
                 .into(),
         }
     }
 
     pub fn sm_limit(&self) -> SMLimit {
         SMLimit {
-            #[cfg(nvidia)]
-            max_blocks: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_BLOCKS_PER_MULTIPROCESSOR) as _,
-            max_threads: self.get_attribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR)
-                as _,
+            // #[cfg(nvidia)]
+            max_blocks: self.get_attribute(mcDevAttrMaxBlocksPerMultiprocessor) as _,
+            max_threads: self.get_attribute(mcDeviceAttributeMaxThreadsPerMultiProcessor) as _,
             max_smem: self
-                .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_MULTIPROCESSOR)
+                .get_attribute(mcDeviceAttributeMaxSharedMemoryPerMultiprocessor)
                 .into(),
             max_registers: self
-                .get_attribute(CU_DEVICE_ATTRIBUTE_MAX_REGISTERS_PER_MULTIPROCESSOR)
+                .get_attribute(mcDeviceAttributeMaxRegistersPerMultiprocessor)
                 .into(),
         }
     }
@@ -143,18 +144,18 @@ impl Device {
 
     pub fn set_mempool_threshold(&self, threshold: u64) {
         let mut mempool = std::ptr::null_mut();
-        driver!(cuDeviceGetDefaultMemPool(&mut mempool, self.0));
-        driver!(cuMemPoolSetAttribute(
+        driver!(mcDeviceGetDefaultMemPool(&mut mempool, self.0));
+        driver!(mcMemPoolSetAttribute(
             mempool,
-            CUmemPool_attribute::CU_MEMPOOL_ATTR_RELEASE_THRESHOLD,
+            mcMemPoolAttr::mcMemPoolAttrReleaseThreshold,
             (&raw const threshold) as _,
         ));
     }
 
     #[inline]
-    fn get_attribute(&self, attr: CUdevice_attribute) -> c_int {
+    fn get_attribute(&self, attr: mcDeviceAttribute_t) -> c_int {
         let mut value = 0;
-        driver!(cuDeviceGetAttribute(&mut value, attr, self.0));
+        driver!(mcDeviceGetAttribute(&mut value, attr, self.0));
         value
     }
 }
@@ -167,12 +168,12 @@ impl fmt::Display for InfoFmt<'_> {
         let sm_limit = self.0.sm_limit();
         let grid = self.0.max_grid_dims();
 
-        #[cfg(nvidia)]
+        #[cfg(not(iluvatar))]
         let reserved = block_limit.reserved_smem;
         #[cfg(iluvatar)]
         let reserved = "unknown";
 
-        #[cfg(nvidia)]
+        #[cfg(not(iluvatar))]
         let sm_blocks = sm_limit.max_blocks;
         #[cfg(iluvatar)]
         let sm_blocks = "unknown";
@@ -228,14 +229,14 @@ pub struct BlockLimit {
     pub max_dims: Dim3,
     pub max_smem: MemSize,
     pub max_smem_optin: MemSize,
-    #[cfg(nvidia)]
+    #[cfg(not(iluvatar))]
     pub reserved_smem: MemSize,
     pub max_registers: MemSize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SMLimit {
-    #[cfg(nvidia)]
+    #[cfg(not(iluvatar))]
     pub max_blocks: usize,
     pub max_threads: usize,
     pub max_smem: MemSize,

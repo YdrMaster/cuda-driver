@@ -1,6 +1,6 @@
 ﻿use crate::{
     Device, MemSize,
-    bindings::{CUcontext, CUdevice},
+    bindings::{MCcontext, MCdevice},
 };
 use context_spore::{AsRaw, RawContainer};
 use std::{
@@ -10,8 +10,8 @@ use std::{
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub struct Context {
-    ctx: CUcontext,
-    dev: CUdevice,
+    ctx: MCcontext,
+    dev: MCdevice,
     primary: bool,
 }
 
@@ -23,8 +23,8 @@ impl Device {
 
         let dev = unsafe { self.as_raw() };
         let mut ctx = null_mut();
-        driver!(cuCtxCreate_v2(&mut ctx, 0, dev));
-        driver!(cuCtxPopCurrent_v2(null_mut()));
+        driver!(mcCtxCreate(&mut ctx, 0, dev));
+        driver!(mcCtxPopCurrent(null_mut()));
         Context {
             ctx,
             dev,
@@ -36,7 +36,7 @@ impl Device {
     pub fn retain_primary(&self) -> Context {
         let dev = unsafe { self.as_raw() };
         let mut ctx = null_mut();
-        driver!(cuDevicePrimaryCtxRetain(&mut ctx, dev));
+        driver!(mcDevicePrimaryCtxRetain(&mut ctx, dev));
         Context {
             ctx,
             dev,
@@ -58,7 +58,7 @@ impl Drop for Context {
                 driver!(cuDevicePrimaryCtxRelease(self.dev))
             }
         } else {
-            driver!(cuCtxDestroy_v2(self.ctx))
+            driver!(mcCtxDestroy(self.ctx))
         }
     }
 }
@@ -67,7 +67,7 @@ unsafe impl Send for Context {}
 unsafe impl Sync for Context {}
 
 impl AsRaw for Context {
-    type Raw = CUcontext;
+    type Raw = MCcontext;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.ctx
@@ -82,23 +82,23 @@ impl Context {
 
     #[inline]
     pub fn apply<T>(&self, f: impl FnOnce(&CurrentCtx) -> T) -> T {
-        driver!(cuCtxPushCurrent_v2(self.ctx));
+        driver!(mcCtxPushCurrent(self.ctx));
         let ans = f(&CurrentCtx(self.ctx));
         let mut top = null_mut();
-        driver!(cuCtxPopCurrent_v2(&mut top));
+        driver!(mcCtxPopCurrent(&mut top));
         assert_eq!(top, self.ctx);
         ans
     }
 }
 
 #[repr(transparent)]
-pub struct CurrentCtx(CUcontext);
+pub struct CurrentCtx(MCcontext);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct NoCtxError;
 
 impl AsRaw for CurrentCtx {
-    type Raw = CUcontext;
+    type Raw = MCcontext;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -109,14 +109,14 @@ impl CurrentCtx {
     #[inline]
     pub fn dev(&self) -> Device {
         let mut dev = 0;
-        driver!(cuCtxGetDevice(&mut dev));
+        driver!(mcCtxGetDevice(&mut dev));
         Device::new(dev)
     }
 
     /// 上下文同步。
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuCtxSynchronize())
+        driver!(mcCtxSynchronize())
     }
 
     /// 获取驱动反馈的当前上下文可用存储空间和总存储空间。
@@ -124,7 +124,7 @@ impl CurrentCtx {
     pub fn mem_info(&self) -> (MemSize, MemSize) {
         let mut free = 0;
         let mut total = 0;
-        driver!(cuMemGetInfo_v2(&mut free, &mut total));
+        driver!(mcMemGetInfo(&mut free, &mut total));
         (free.into(), total.into())
     }
 
@@ -132,7 +132,7 @@ impl CurrentCtx {
     #[inline]
     pub fn apply_current<T>(f: impl FnOnce(&Self) -> T) -> Result<T, NoCtxError> {
         let mut raw = null_mut();
-        driver!(cuCtxGetCurrent(&mut raw));
+        driver!(mcCtxGetCurrent(&mut raw));
         if !raw.is_null() {
             Ok(f(&Self(raw)))
         } else {
@@ -146,7 +146,7 @@ impl CurrentCtx {
     ///
     /// The `raw` context must be the current pushed context.
     #[inline]
-    pub unsafe fn apply_current_unchecked<T>(raw: CUcontext, f: impl FnOnce(&Self) -> T) -> T {
+    pub unsafe fn apply_current_unchecked<T>(raw: MCcontext, f: impl FnOnce(&Self) -> T) -> T {
         f(&Self(raw))
     }
 
@@ -157,7 +157,7 @@ impl CurrentCtx {
     /// The `raw` context must be the current pushed context.
     /// Generally, this method only used for [`RawContainer::ctx`] with limited lifetime.
     #[inline]
-    pub unsafe fn from_raw<'ctx>(raw: &CUcontext) -> &'ctx Self {
+    pub unsafe fn from_raw<'ctx>(raw: &MCcontext) -> &'ctx Self {
         let ptr = (&raw const *raw).cast::<Self>();
         unsafe { &*ptr }
     }
@@ -168,7 +168,7 @@ impl CurrentCtx {
     ///
     /// The raw object must be created in this [`Context`].
     #[inline]
-    pub unsafe fn wrap_raw<T: Unpin + 'static>(&self, rss: T) -> RawContainer<CUcontext, T> {
+    pub unsafe fn wrap_raw<T: Unpin + 'static>(&self, rss: T) -> RawContainer<MCcontext, T> {
         RawContainer { ctx: self.0, rss }
     }
 }
@@ -177,7 +177,7 @@ impl CurrentCtx {
     /// 将一段 host 存储空间注册为锁页内存，以允许从这个上下文直接访问。
     pub fn lock_page<T>(&self, slice: &[T]) {
         let ptrs = slice.as_ptr_range();
-        driver!(cuMemHostRegister_v2(
+        driver!(mcHostRegister(
             ptrs.start as _,
             ptrs.end as usize - ptrs.start as usize,
             0,
@@ -186,7 +186,7 @@ impl CurrentCtx {
 
     /// 将一段 host 存储空间从锁页内存注销。
     pub fn unlock_page<T>(&self, slice: &[T]) {
-        driver!(cuMemHostUnregister(slice.as_ptr() as _));
+        driver!(mcHostUnregister(slice.as_ptr() as _));
     }
 }
 
@@ -198,7 +198,7 @@ fn test_primary() {
     let dev = crate::Device::new(0);
     let mut flags = 0;
     let mut active = 0;
-    driver!(cuDevicePrimaryCtxGetState(
+    driver!(mcDevicePrimaryCtxGetState(
         dev.as_raw(),
         &mut flags,
         &mut active
@@ -207,10 +207,10 @@ fn test_primary() {
     assert_eq!(active, 0);
 
     let mut pctx = null_mut();
-    driver!(cuDevicePrimaryCtxRetain(&mut pctx, dev.as_raw()));
+    driver!(mcDevicePrimaryCtxRetain(&mut pctx, dev.as_raw()));
     assert!(!pctx.is_null());
 
-    driver!(cuDevicePrimaryCtxGetState(
+    driver!(mcDevicePrimaryCtxGetState(
         dev.as_raw(),
         &mut flags,
         &mut active
@@ -218,7 +218,7 @@ fn test_primary() {
     assert_eq!(flags, 0);
     assert_ne!(active, 0);
 
-    driver!(cuCtxGetCurrent(&mut pctx));
+    driver!(mcCtxGetCurrent(&mut pctx));
     assert!(pctx.is_null());
 }
 

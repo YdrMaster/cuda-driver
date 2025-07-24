@@ -1,15 +1,15 @@
-﻿use crate::bindings::{cublasLtMatrixLayout_t, cublasLtOrder_t, cudaDataType};
+﻿use crate::bindings::{macaDataType_t, mcblasLtMatrixLayout_t, mcblasLtOrder_t};
 use cuda::AsRaw;
 use std::ptr::null_mut;
 
 #[repr(transparent)]
-pub struct CublasLtMatrix(cublasLtMatrixLayout_t);
+pub struct CublasLtMatrix(mcblasLtMatrixLayout_t);
 
 unsafe impl Send for CublasLtMatrix {}
 unsafe impl Sync for CublasLtMatrix {}
 
 impl AsRaw for CublasLtMatrix {
-    type Raw = cublasLtMatrixLayout_t;
+    type Raw = mcblasLtMatrixLayout_t;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -19,14 +19,14 @@ impl AsRaw for CublasLtMatrix {
 impl Drop for CublasLtMatrix {
     #[inline]
     fn drop(&mut self) {
-        cublas!(cublasLtMatrixLayoutDestroy(self.0));
+        cublas!(mcblasLtMatrixLayoutDestroy(self.0));
     }
 }
 
 impl From<CublasLtMatrixLayout> for CublasLtMatrix {
     fn from(layout: CublasLtMatrixLayout) -> Self {
         let mut matrix = null_mut();
-        cublas!(cublasLtMatrixLayoutCreate(
+        cublas!(mcblasLtMatrixLayoutCreate(
             &mut matrix,
             layout.data_type,
             layout.rows,
@@ -34,21 +34,21 @@ impl From<CublasLtMatrixLayout> for CublasLtMatrix {
             layout.major_stride,
         ));
         let order = unsafe { layout.order.as_raw() };
-        cublas!(cublasLtMatrixLayoutSetAttribute(
+        cublas!(mcblasLtMatrixLayoutSetAttribute(
             matrix,
-            cublasLtMatrixLayoutAttribute_t::CUBLASLT_MATRIX_LAYOUT_ORDER,
+            mcblasLtMatrixLayoutAttribute_t::MCBLASLT_MATRIX_LAYOUT_ORDER,
             (&raw const order).cast(),
             size_of_val(&order),
         ));
-        cublas!(cublasLtMatrixLayoutSetAttribute(
+        cublas!(mcblasLtMatrixLayoutSetAttribute(
             matrix,
-            cublasLtMatrixLayoutAttribute_t::CUBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
+            mcblasLtMatrixLayoutAttribute_t::MCBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
             (&raw const layout.batch).cast(),
             size_of_val(&layout.batch),
         ));
-        cublas!(cublasLtMatrixLayoutSetAttribute(
+        cublas!(mcblasLtMatrixLayoutSetAttribute(
             matrix,
-            cublasLtMatrixLayoutAttribute_t::CUBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
+            mcblasLtMatrixLayoutAttribute_t::MCBLASLT_MATRIX_LAYOUT_STRIDED_BATCH_OFFSET,
             (&raw const layout.stride).cast(),
             size_of_val(&layout.stride),
         ));
@@ -57,7 +57,7 @@ impl From<CublasLtMatrixLayout> for CublasLtMatrix {
 }
 
 pub struct CublasLtMatrixLayout {
-    pub data_type: cudaDataType,
+    pub data_type: macaDataType_t,
     pub batch: i32,
     pub stride: i64,
     pub rows: u64,
@@ -73,12 +73,12 @@ pub enum MatrixOrder {
 }
 
 impl AsRaw for MatrixOrder {
-    type Raw = cublasLtOrder_t;
+    type Raw = mcblasLtOrder_t;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         match self {
-            Self::RowMajor => Self::Raw::CUBLASLT_ORDER_ROW,
-            Self::ColMajor => Self::Raw::CUBLASLT_ORDER_COL,
+            Self::RowMajor => Self::Raw::MCBLASLT_ORDER_ROW,
+            Self::ColMajor => Self::Raw::MCBLASLT_ORDER_COL,
         }
     }
 }
@@ -87,7 +87,7 @@ impl AsRaw for MatrixOrder {
 fn test_behavior() {
     // 据测试，这个类型是 CPU 上的，不需要在上下文中调用。
     let _mat = CublasLtMatrix::from(CublasLtMatrixLayout {
-        data_type: cudaDataType::CUDA_R_16F,
+        data_type: macaDataType_t::MACA_R_16F,
         batch: 1,
         stride: 0,
         rows: 128,

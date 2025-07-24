@@ -1,14 +1,14 @@
-use crate::{CurrentCtx, Dim3, KernelFn, bindings::CUstream};
+use crate::{CurrentCtx, Dim3, KernelFn, bindings::MCstream};
 use context_spore::{AsRaw, impl_spore};
 use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
-impl_spore!(Stream and StreamSpore by (CurrentCtx, CUstream));
+impl_spore!(Stream and StreamSpore by (CurrentCtx, MCstream));
 
 impl CurrentCtx {
     #[inline]
     pub fn stream(&self) -> Stream {
         let mut stream = null_mut();
-        driver!(cuStreamCreate(&mut stream, 0));
+        driver!(mcStreamCreate(&mut stream));
         Stream(unsafe { self.wrap_raw(stream) }, PhantomData)
     }
 }
@@ -17,12 +17,12 @@ impl Drop for Stream<'_> {
     #[inline]
     fn drop(&mut self) {
         self.synchronize();
-        driver!(cuStreamDestroy_v2(self.0.rss))
+        driver!(mcStreamDestroy(self.0.rss))
     }
 }
 
 impl AsRaw for Stream<'_> {
-    type Raw = CUstream;
+    type Raw = MCstream;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.rss
@@ -39,7 +39,7 @@ impl Stream<'_> {
         let (grid, block, shared_mem) = attrs;
         let grid = grid.into();
         let block = block.into();
-        driver!(cuLaunchKernel(
+        driver!(mcModuleLaunchKernel(
             f.as_raw(),
             grid.x,
             grid.y,
@@ -57,7 +57,7 @@ impl Stream<'_> {
 
     #[inline]
     pub fn synchronize(&self) -> &Self {
-        driver!(cuStreamSynchronize(self.0.rss));
+        driver!(mcStreamSynchronize(self.0.rss));
         self
     }
 }

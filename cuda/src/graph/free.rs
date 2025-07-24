@@ -12,7 +12,7 @@ impl Graph {
         let deps = collect_dependencies(deps);
 
         let mut node = null_mut();
-        driver!(cuGraphAddMemFreeNode(
+        driver!(mcGraphAddMemFreeNode(
             &mut node,
             self.as_raw(),
             deps.as_ptr(),
@@ -22,6 +22,7 @@ impl Graph {
         MemFreeNode(node, PhantomData)
     }
 
+    #[cfg(nvidia)]
     pub fn add_free_node<'a>(
         &self,
         node: &MemFreeNode,
