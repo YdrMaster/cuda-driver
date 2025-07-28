@@ -16,7 +16,7 @@ impl Deref for CommunicatorGroup {
 impl CommunicatorGroup {
     pub fn new(devlist: &[c_int]) -> Self {
         let mut comms = vec![null_mut(); devlist.len()];
-        nccl!(ncclCommInitAll(
+        nccl!(hcclCommInitAll(
             comms.as_mut_ptr(),
             devlist.len() as _,
             devlist.as_ptr()
@@ -41,7 +41,7 @@ impl CommunicatorGroup {
 
     #[inline]
     pub fn call(&self) -> GroupGuard {
-        nccl!(ncclGroupStart());
+        nccl!(hcclGroupStart());
         GroupGuard(&self.0)
     }
 
@@ -65,6 +65,6 @@ impl Deref for GroupGuard<'_> {
 impl Drop for GroupGuard<'_> {
     #[inline]
     fn drop(&mut self) {
-        nccl!(ncclGroupEnd());
+        nccl!(hcclGroupEnd());
     }
 }

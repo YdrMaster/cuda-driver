@@ -15,7 +15,7 @@ impl CurrentCtx {
     pub fn malloc_host<T: Copy>(&self, len: usize) -> HostMem {
         let len = Layout::array::<T>(len).unwrap().size();
         let mut ptr = null_mut();
-        driver!(cuMemHostAlloc(&mut ptr, len, 0));
+        driver!(hcMallocHost(&mut ptr, len, 0));
         HostMem(unsafe { self.wrap_raw(Blob { ptr, len }) }, PhantomData)
     }
 }
@@ -23,7 +23,7 @@ impl CurrentCtx {
 impl Drop for HostMem<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuMemFreeHost(self.0.rss.ptr))
+        driver!(hcFreeHost(self.0.rss.ptr))
     }
 }
 
@@ -74,12 +74,12 @@ fn test_behavior() {
     }
     let mut ptr = null_mut();
     crate::Device::new(0).context().apply(|_| {
-        driver!(cuMemHostAlloc(&mut ptr, 128, 0));
-        driver!(cuMemFreeHost(ptr));
+        driver!(hcMallocHost(&mut ptr, 128, 0));
+        driver!(hcFreeHost(ptr));
     });
     // NOTICE 天数不支持这个行为，即使是释放空指针，依然需要在合法的上下文中进行
-    #[cfg(nvidia)]
-    driver!(cuMemFreeHost(null_mut()))
+    #[cfg(not(iluvatar))]
+    driver!(hcFreeHost(null_mut()))
 }
 
 #[test]

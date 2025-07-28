@@ -11,7 +11,7 @@ impl Communicator {
             dst.len() / count
         };
         let recvbuff = dst.as_mut_ptr().cast::<c_void>();
-        nccl!(ncclAllGather(
+        nccl!(hcclAllGather(
             if let Some(src) = src {
                 assert_eq!(src.len(), size);
                 src.as_ptr() as *mut c_void
@@ -20,7 +20,7 @@ impl Communicator {
             },
             recvbuff,
             size,
-            ncclDataType_t::ncclUint8,
+            hcclDataType_t::hcclUint8,
             self.as_raw(),
             stream.as_raw() as _,
         ));

@@ -1,17 +1,14 @@
-use crate::{CurrentCtx, Stream, bindings::CUevent};
+use crate::{CurrentCtx, Stream, bindings::HCevent};
 use context_spore::{AsRaw, impl_spore};
 use std::{marker::PhantomData, ptr::null_mut, time::Duration};
 
-impl_spore!(Event and EventSpore by (CurrentCtx, CUevent));
+impl_spore!(Event and EventSpore by (CurrentCtx, HCevent));
 
 impl<'ctx> Stream<'ctx> {
     pub fn record(&self) -> Event<'ctx> {
         let mut event = null_mut();
-        driver!(cuEventCreate(
-            &mut event,
-            CUstream_flags::CU_STREAM_DEFAULT as _
-        ));
-        driver!(cuEventRecord(event, self.as_raw()));
+        driver!(hcEventCreate(&mut event));
+        driver!(hcEventRecord(event, self.as_raw()));
         Event(unsafe { self.ctx().wrap_raw(event) }, PhantomData)
     }
 }
@@ -19,12 +16,12 @@ impl<'ctx> Stream<'ctx> {
 impl Drop for Event<'_> {
     #[inline]
     fn drop(&mut self) {
-        driver!(cuEventDestroy_v2(self.0.rss));
+        driver!(hcEventDestroy(self.0.rss));
     }
 }
 
 impl AsRaw for Event<'_> {
-    type Raw = CUevent;
+    type Raw = HCevent;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0.rss
@@ -34,7 +31,7 @@ impl AsRaw for Event<'_> {
 impl Stream<'_> {
     #[inline]
     pub fn wait_for(&self, event: &Event) -> &Self {
-        driver!(cuStreamWaitEvent(self.as_raw(), event.0.rss, 0));
+        driver!(hcStreamWaitEvent(self.as_raw(), event.0.rss, 0));
         self
     }
 
@@ -57,23 +54,23 @@ impl Stream<'_> {
 impl Event<'_> {
     #[inline]
     pub fn is_complete(&self) -> bool {
-        use crate::bindings::{cuEventQuery, cudaError_enum as E};
-        match unsafe { cuEventQuery(self.0.rss) } {
-            E::CUDA_SUCCESS => true,
-            E::CUDA_ERROR_NOT_READY => false,
+        use crate::bindings::{hcError_t as E, hcEventQuery};
+        match unsafe { hcEventQuery(self.0.rss) } {
+            E::hcSuccess => true,
+            E::hcErrorNotReady => false,
             err => panic!("Unexpected error: {err:?}"),
         }
     }
 
     #[inline]
     pub fn synchronize(&self) {
-        driver!(cuEventSynchronize(self.0.rss))
+        driver!(hcEventSynchronize(self.0.rss))
     }
 
     #[inline]
     pub fn elapse_from(&self, start: &Self) -> Duration {
         let mut ms = 0.;
-        driver!(cuEventElapsedTime(&mut ms, start.0.rss, self.0.rss));
+        driver!(hcEventElapsedTime(&mut ms, start.0.rss, self.0.rss));
         Duration::from_secs_f32(ms * 1e-3)
     }
 }

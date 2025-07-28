@@ -1,6 +1,6 @@
 use crate::{
     Version,
-    bindings::{nvrtcCompileProgram, nvrtcResult},
+    bindings::{hcrtcCompileProgram, hcrtcResult},
 };
 use std::{
     env::temp_dir,
@@ -16,7 +16,7 @@ use std::{
 pub struct Ptx(Vec<u8>);
 
 impl Ptx {
-    pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, nvrtcResult>, String) {
+    pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, hcrtcResult>, String) {
         let code = code.as_ref();
 
         let options = collect_options(code, cc);
@@ -44,7 +44,7 @@ impl Ptx {
             .unwrap()
         };
         let mut program = null_mut();
-        nvrtc!(nvrtcCreateProgram(
+        nvrtc!(hcrtcCreateProgram(
             &mut program,
             code.as_ptr().cast(),
             null(),
@@ -53,25 +53,25 @@ impl Ptx {
             null(),
         ));
 
-        let result = unsafe { nvrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
+        let result = unsafe { hcrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
         let log = {
             let mut log_len = 0;
-            nvrtc!(nvrtcGetProgramLogSize(program, &mut log_len));
+            nvrtc!(hcrtcGetProgramLogSize(program, &mut log_len));
             if log_len > 1 {
                 let mut log = vec![0u8; log_len];
-                nvrtc!(nvrtcGetProgramLog(program, log.as_mut_ptr().cast()));
+                nvrtc!(hcrtcGetProgramLog(program, log.as_mut_ptr().cast()));
                 log.pop();
                 std::str::from_utf8(&log).unwrap().trim().to_string()
             } else {
                 String::new()
             }
         };
-        let ans = if result == nvrtcResult::NVRTC_SUCCESS {
+        let ans = if result == hcrtcResult::HCRTC_SUCCESS {
             let mut ptx_len = 0;
-            nvrtc!(nvrtcGetPTXSize(program, &mut ptx_len));
+            nvrtc!(hcrtcGetBitcodeSize(program, &mut ptx_len));
             let mut ptx = vec![0u8; ptx_len];
-            nvrtc!(nvrtcGetPTX(program, ptx.as_mut_ptr().cast()));
-            nvrtc!(nvrtcDestroyProgram(&mut program));
+            nvrtc!(hcrtcGetBitcode(program, ptx.as_mut_ptr().cast()));
+            nvrtc!(hcrtcDestroyProgram(&mut program));
             Ok(Self(ptx))
         } else {
             Err(result)
@@ -107,8 +107,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
     fn include_dir(dir: impl fmt::Display) -> CString {
         CString::new(format!("-I{dir}")).unwrap()
     }
-    #[cfg(nvidia)]
-    {
+    if cfg!(nvidia) {
         use std::sync::LazyLock;
         static VERSION: LazyLock<Version> = LazyLock::new(crate::version);
         const TARGET: Version = Version {
@@ -133,9 +132,9 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
                 log::warn!("cccl not found, but cub or thrust is used in code")
             }
         }
+    } else {
+        let _ = code;
     }
-    #[cfg(iluvatar)]
-    let _ = code;
 
     // let cutlass = std::option_env!("CUTLASS_ROOT").map_or_else(
     //     || PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("cutlass"),
@@ -152,6 +151,8 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
         find_cuda_helper::find_cuda_root().unwrap()
     } else if cfg!(iluvatar) {
         search_corex_tools::find_corex().unwrap()
+    } else if cfg!(metax) {
+        search_maca_tools::find_maca_root().unwrap().1
     } else {
         unimplemented!()
     };

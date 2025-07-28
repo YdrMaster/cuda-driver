@@ -1,8 +1,8 @@
 ﻿use crate::{
     MemSize, Module, Version,
     bindings::{
-        CUfunction,
-        CUfunction_attribute::{self, *},
+        HCfunction,
+        hcFunction_attribute::{self, *},
     },
 };
 use context_spore::AsRaw;
@@ -16,13 +16,13 @@ use std::{
 
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
-pub struct KernelFn<'m>(CUfunction, PhantomData<&'m ()>);
+pub struct KernelFn<'m>(HCfunction, PhantomData<&'m ()>);
 
 impl Module<'_> {
     pub fn get_kernel(&self, name: impl AsRef<CStr>) -> KernelFn {
         let name = name.as_ref();
         let mut kernel = null_mut();
-        driver!(cuModuleGetFunction(
+        driver!(hcModuleGetFunction(
             &mut kernel,
             self.as_raw(),
             name.as_ptr().cast(),
@@ -32,7 +32,7 @@ impl Module<'_> {
 }
 
 impl AsRaw for KernelFn<'_> {
-    type Raw = CUfunction;
+    type Raw = HCfunction;
     #[inline]
     unsafe fn as_raw(&self) -> Self::Raw {
         self.0
@@ -42,35 +42,35 @@ impl AsRaw for KernelFn<'_> {
 impl KernelFn<'_> {
     #[inline]
     pub fn max_threads_per_block(&self) -> usize {
-        self.get_attribute(CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK) as _
+        self.get_attribute(HC_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK) as _
     }
 
     #[inline]
     pub fn static_smem(&self) -> MemSize {
-        self.get_attribute(CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES)
+        self.get_attribute(HC_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES)
             .into()
     }
 
     #[inline]
     pub fn max_dyn_smem(&self) -> MemSize {
-        self.get_attribute(CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES)
+        self.get_attribute(HC_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES)
             .into()
     }
 
     #[inline]
     pub fn local_mem(&self) -> MemSize {
-        self.get_attribute(CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES)
+        self.get_attribute(HC_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES)
             .into()
     }
 
     #[inline]
     pub fn num_regs(&self) -> MemSize {
-        self.get_attribute(CU_FUNC_ATTRIBUTE_NUM_REGS).into()
+        self.get_attribute(HC_FUNC_ATTRIBUTE_NUM_REGS).into()
     }
 
     #[inline]
     pub fn ptx_version(&self) -> Version {
-        let version = self.get_attribute(CU_FUNC_ATTRIBUTE_PTX_VERSION);
+        let version = self.get_attribute(HC_FUNC_ATTRIBUTE_PTX_VERSION);
         Version {
             major: version / 10,
             minor: version % 10,
@@ -79,7 +79,7 @@ impl KernelFn<'_> {
 
     #[inline]
     pub fn binary_version(&self) -> Version {
-        let version = self.get_attribute(CU_FUNC_ATTRIBUTE_PTX_VERSION);
+        let version = self.get_attribute(HC_FUNC_ATTRIBUTE_PTX_VERSION);
         Version {
             major: version / 10,
             minor: version % 10,
@@ -92,9 +92,9 @@ impl KernelFn<'_> {
     }
 
     #[inline]
-    fn get_attribute(&self, attr: CUfunction_attribute) -> c_int {
+    fn get_attribute(&self, attr: hcFunction_attribute) -> c_int {
         let mut value = 0;
-        driver!(cuFuncGetAttribute(&mut value, attr, self.0));
+        driver!(hcFuncGetAttribute(&mut value, attr, self.0));
         value
     }
 }
