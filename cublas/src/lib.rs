@@ -1,4 +1,4 @@
-#![cfg(any(nvidia, iluvatar))]
+#![cfg(any(nvidia, iluvatar, metax))]
 #![deny(warnings)]
 
 #[macro_use]
