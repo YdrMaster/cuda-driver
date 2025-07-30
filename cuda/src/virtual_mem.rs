@@ -272,7 +272,7 @@ fn test_behavior() {
 // #[test] // 这个函数会毁坏 context，这会干扰其他线程上的其他 context，在并发情况下导致异常行为
 fn test_unmap() {
     use crate::{
-        Ptx,
+        Rtc,
         bindings::{CUresult, cuStreamSynchronize},
         params,
     };
@@ -300,7 +300,10 @@ extern "C" __global__ void add(int* p) {
     }
 
     let dev = Device::new(0);
-    let (ptx, _log) = Ptx::compile(CODE, dev.compute_capability());
+    let program = Rtc::new()
+        .arch(dev.compute_capability())
+        .compile(CODE)
+        .unwrap();
 
     let prop = dev.mem_prop();
     let minium = prop.granularity_minimum();
@@ -310,7 +313,7 @@ extern "C" __global__ void add(int* p) {
 
     dev.context().apply(|ctx| {
         println!("host thread = {:?}", std::thread::current());
-        let module = ctx.load(&ptx.unwrap());
+        let module = ctx.load(&program);
         let print = module.get_kernel(c"print");
         let add = module.get_kernel(c"add");
 

@@ -266,9 +266,9 @@ fn collect_dependencies<'a>(
 
 #[cfg(test)]
 mod test {
-    use crate::{Device, Ptx, Symbol, params};
+    use crate::{Device, Rtc, Symbol, params};
     use context_spore::AsRaw;
-    use std::{ffi::CString, ptr::null_mut, str::FromStr};
+    use std::ptr::null_mut;
 
     #[test]
     fn test_behavior() {
@@ -312,8 +312,11 @@ extern "C" __global__ void mul(float *a, float const *b) {
         }
 
         Device::new(0).context().apply(|ctx| {
-            let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
-            let module = ctx.load(&ptx.unwrap());
+            let program = Rtc::new()
+                .arch(ctx.dev().compute_capability())
+                .compile(CODE)
+                .unwrap();
+            let module = ctx.load(&program);
 
             let mut kernels =
                 Symbol::search(CODE).map(|name| module.get_kernel(name.to_c_string()));
@@ -375,9 +378,12 @@ extern "C" __global__ void mul(float *a, float const *b) {
         }
 
         Device::new(0).context().apply(|ctx| {
-            let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
-            let module = ctx.load(&ptx.unwrap());
-            let kernel = module.get_kernel(CString::from_str("print").unwrap());
+            let program = Rtc::new()
+                .arch(ctx.dev().compute_capability())
+                .compile(CODE)
+                .unwrap();
+            let module = ctx.load(&program);
+            let kernel = module.get_kernel(c"print");
 
             let stream = ctx.stream().capture();
             // cuda graph 会将 kernel 用到的参数拷贝保存在节点中

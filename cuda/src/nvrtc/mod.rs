@@ -1,12 +1,12 @@
 ﻿mod kernel_fn;
 mod module;
-mod ptx;
+mod rtc;
 
 use std::{ffi::CString, str::FromStr};
 
 pub use kernel_fn::{KernelFn, KernelParamPtrs, KernelParams};
 pub use module::{Module, ModuleSpore};
-pub use ptx::Ptx;
+pub use rtc::Rtc;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Symbol<'a> {
@@ -90,7 +90,6 @@ fn test_behavior() {
         ptx
     };
     let ptx = ptx.as_slice();
-    let name = CString::new("kernel").unwrap();
 
     let mut m = null_mut();
     let mut f = null_mut();
@@ -100,7 +99,7 @@ fn test_behavior() {
     }
     crate::Device::new(0).context().apply(|_| {
         driver!(cuModuleLoadData(&mut m, ptx.as_ptr().cast()));
-        driver!(cuModuleGetFunction(&mut f, m, name.as_ptr()));
+        driver!(cuModuleGetFunction(&mut f, m, c"kernel".as_ptr()));
         #[rustfmt::skip]
         driver!(cuLaunchKernel(f, 1, 1, 1, 1, 1, 1, 0, null_mut(), null_mut(), null_mut()));
     });

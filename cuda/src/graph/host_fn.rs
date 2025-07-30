@@ -45,7 +45,7 @@ impl Graph {
 
 #[cfg(test)]
 mod test {
-    use crate::{AsRaw, Ptx, bindings::CUDA_HOST_NODE_PARAMS, graph::Graph, params};
+    use crate::{AsRaw, Rtc, bindings::CUDA_HOST_NODE_PARAMS, graph::Graph, params};
     use std::ptr::{null, null_mut};
 
     #[test]
@@ -66,8 +66,11 @@ mod test {
             return;
         }
         crate::Device::new(0).context().apply(|ctx| {
-            let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
-            let module = ctx.load(&ptx.unwrap());
+            let program = Rtc::new()
+                .arch(ctx.dev().compute_capability())
+                .compile(CODE)
+                .unwrap();
+            let module = ctx.load(&program);
             let kernel = module.get_kernel(c"print");
 
             let stream = ctx.stream();
@@ -103,8 +106,11 @@ mod test {
             return;
         }
         crate::Device::new(0).context().apply(|ctx| {
-            let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
-            let module = ctx.load(&ptx.unwrap());
+            let program = Rtc::new()
+                .arch(ctx.dev().compute_capability())
+                .compile(CODE)
+                .unwrap();
+            let module = ctx.load(&program);
             let kernel = module.get_kernel(c"print");
 
             let stream = ctx.stream();
@@ -144,8 +150,11 @@ mod test {
             return;
         }
         crate::Device::new(0).context().apply(|ctx| {
-            let (ptx, _log) = Ptx::compile(CODE, ctx.dev().compute_capability());
-            let module = ctx.load(&ptx.unwrap());
+            let program = Rtc::new()
+                .arch(ctx.dev().compute_capability())
+                .compile(CODE)
+                .unwrap();
+            let module = ctx.load(&program);
             let kernel = module.get_kernel(c"print");
 
             let graph = Graph::new();

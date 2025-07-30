@@ -71,7 +71,7 @@ pub use event::{Event, EventSpore};
 #[cfg(any(nvidia, all(iluvatar, not(test))))]
 pub use graph::*;
 pub use host_mem::{HostMem, HostMemSpore};
-pub use nvrtc::{KernelFn, KernelParamPtrs, KernelParams, Module, ModuleSpore, Ptx, Symbol};
+pub use nvrtc::{KernelFn, KernelParamPtrs, KernelParams, Module, ModuleSpore, Rtc, Symbol};
 pub use stream::{Stream, StreamSpore};
 pub use virtual_mem::{MemProp, PhyMem, VirByte, VirMem};
 

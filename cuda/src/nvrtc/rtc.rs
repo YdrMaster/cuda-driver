@@ -1,28 +1,95 @@
-use crate::{
+﻿use crate::{
     Version,
     bindings::{nvrtcCompileProgram, nvrtcResult},
 };
 use std::{
-    env::temp_dir,
-    ffi::{CString, c_char},
+    collections::BTreeSet,
+    ffi::CString,
     fmt,
     path::PathBuf,
-    process::Command,
     ptr::{null, null_mut},
-    sync::OnceLock,
+    str::FromStr,
 };
 
-#[repr(transparent)]
-pub struct Ptx(Vec<u8>);
+#[derive(Clone, Debug)]
+pub struct Rtc {
+    cc: Version,
+    std: usize,
+    line_info: bool,
+    fast_math: bool,
+    extra_device_vectorization: bool,
+    include: BTreeSet<PathBuf>,
+}
 
-impl Ptx {
-    pub fn compile(code: impl AsRef<str>, cc: Version) -> (Result<Self, nvrtcResult>, String) {
-        let code = code.as_ref();
+pub struct Program {
+    pub bin: Box<[u8]>,
+    pub code: String,
+    pub log: String,
+}
 
-        let options = collect_options(code, cc);
+pub struct CompilationError {
+    pub result: nvrtcResult,
+    pub code: String,
+    pub log: String,
+}
+
+impl Default for Rtc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Rtc {
+    pub fn new() -> Self {
+        Self {
+            cc: Version { major: 8, minor: 0 },
+            std: 17,
+            line_info: false,
+            fast_math: false,
+            extra_device_vectorization: false,
+            include: Default::default(),
+        }
+    }
+
+    pub fn arch(mut self, cc: Version) -> Self {
+        self.cc = cc;
+        self
+    }
+
+    pub fn std(mut self, version: usize) -> Self {
+        assert!(matches!(version, 3 | 11 | 14 | 17 | 20));
+        self.std = version;
+        self
+    }
+
+    pub fn line_info(mut self, enable: bool) -> Self {
+        self.line_info = enable;
+        self
+    }
+
+    pub fn fast_math(mut self, enable: bool) -> Self {
+        self.fast_math = enable;
+        self
+    }
+
+    pub fn extra_device_vectorization(mut self, enable: bool) -> Self {
+        self.extra_device_vectorization = enable;
+        self
+    }
+
+    pub fn include(mut self, path: impl Into<PathBuf>) -> Self {
+        self.include.insert(path.into());
+        self
+    }
+
+    pub fn compile(&self, code: &str) -> Result<Program, CompilationError> {
+        let options = self.generate();
+        let extra_includes = extra_includes(code);
+
         let options = options
             .iter()
-            .map(|s| s.as_ptr().cast::<c_char>())
+            .map(|s| s.as_ref().as_ptr())
+            .chain(extra_includes.iter().map(|s| s.as_ptr()))
             .collect::<Vec<_>>();
 
         let code = {
@@ -52,6 +119,7 @@ impl Ptx {
             null(),
             null(),
         ));
+        let code = code.to_string_lossy().to_string();
 
         let result = unsafe { nvrtcCompileProgram(program, options.len() as _, options.as_ptr()) };
         let log = {
@@ -66,44 +134,64 @@ impl Ptx {
                 String::new()
             }
         };
-        let ans = if result == nvrtcResult::NVRTC_SUCCESS {
+        if result == nvrtcResult::NVRTC_SUCCESS {
             let mut ptx_len = 0;
             nvrtc!(nvrtcGetPTXSize(program, &mut ptx_len));
-            let mut ptx = vec![0u8; ptx_len];
-            nvrtc!(nvrtcGetPTX(program, ptx.as_mut_ptr().cast()));
+            let mut bin = vec![0u8; ptx_len].into_boxed_slice();
+            nvrtc!(nvrtcGetPTX(program, bin.as_mut_ptr().cast()));
             nvrtc!(nvrtcDestroyProgram(&mut program));
-            Ok(Self(ptx))
+            Ok(Program { bin, code, log })
         } else {
-            Err(result)
-        };
-        (ans, log)
+            Err(CompilationError { result, code, log })
+        }
+    }
+
+    fn generate(&self) -> Vec<CString> {
+        let &Self {
+            cc,
+            std,
+            line_info,
+            fast_math,
+            extra_device_vectorization,
+            ref include,
+        } = self;
+        let mut vec = [
+            format!("-arch=compute_{}", cc.to_arch_string()),
+            format!("-std=c++{std}"),
+        ]
+        .map(|s| CString::from_str(&s).unwrap())
+        .to_vec();
+        if line_info {
+            vec.push(c"-lineinfo".into())
+        }
+        if fast_math {
+            vec.push(c"-use_fast_math".into())
+        }
+        if extra_device_vectorization {
+            vec.push(c"-extra-device-vectorization".into())
+        }
+        vec.extend(
+            include
+                .iter()
+                .map(|dir| CString::new(format!("-I{}", dir.display())).unwrap()),
+        );
+        vec
     }
 }
 
-impl fmt::Display for Ptx {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", String::from_utf8_lossy(&self.0))
+impl fmt::Debug for CompilationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "rtc failed with {:?}", self.result)?;
+        if !self.log.is_empty() {
+            writeln!(f, "{}", self.log)
+        } else {
+            Ok(())
+        }
     }
 }
 
-impl Ptx {
-    #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
-        self.0.as_ptr()
-    }
-}
-
-fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
-    let mut options = vec![
-        CString::new("--std=c++17").unwrap(),
-        #[cfg(nvidia)]
-        CString::new(format!(
-            "--gpu-architecture=compute_{}",
-            _cc.to_arch_string()
-        ))
-        .unwrap(),
-    ];
+fn extra_includes(code: &str) -> Vec<CString> {
+    let mut ans = Vec::new();
     fn include_dir(dir: impl fmt::Display) -> CString {
         CString::new(format!("-I{dir}")).unwrap()
     }
@@ -125,7 +213,7 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
                     "cub",
                     "thrust",
                 ];
-                options.extend(
+                ans.extend(
                     DIRS.iter()
                         .map(|path| include_dir(cccl.join(path).display())),
                 )
@@ -156,11 +244,14 @@ fn collect_options(code: &str, _cc: Version) -> Vec<CString> {
         unimplemented!()
     };
 
-    options.push(include_dir(toolkit.join("include").display()));
-    options
+    ans.push(include_dir(toolkit.join("include").display()));
+    ans
 }
-#[allow(dead_code)]
+
+#[cfg(nvidia)]
 fn clone_cccl() -> PathBuf {
+    use std::{env::temp_dir, process::Command, sync::OnceLock};
+
     static ONCE: OnceLock<PathBuf> = OnceLock::new();
     ONCE.get_or_init(|| {
         let temp = temp_dir();
